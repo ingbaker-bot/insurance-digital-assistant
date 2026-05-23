@@ -1010,6 +1010,40 @@
 </div>
 
 <script>
+  // ══════════════════════════════════════════════════════
+  // ★ GAS API 設定（部署後請填入你的 Web App URL）
+  // 格式：https://script.google.com/macros/s/【你的部署ID】/exec
+  // ══════════════════════════════════════════════════════
+  var GAS_API_URL = 'https://script.google.com/macros/s/AKfycbybNkAAa6Tm5Ensf-Ly2wlHVEwBD-Wxyu0M4v7gnGHowuEILmKyHdpQ_q55nsS5gUfXUA/exec';
+
+  /**
+   * 統一呼叫 GAS API 的輔助函式
+   * @param {string} action  - API action 名稱
+   * @param {object} params  - 額外參數 { q, no, id, policyNo, status, nickname }
+   * @param {function} successFn - 成功回呼 fn(data)
+   * @param {function} [failFn]  - 失敗回呼 fn(err)（可選）
+   */
+  function gasCall(action, params, successFn, failFn) {
+    var url = GAS_API_URL + '?action=' + encodeURIComponent(action);
+    if (params) {
+      Object.keys(params).forEach(function(k) {
+        url += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(params[k] || '');
+      });
+    }
+    fetch(url)
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(data) {
+        if (successFn) successFn(data);
+      })
+      .catch(function(err) {
+        console.error('[gasCall] ' + action, err);
+        if (failFn) failFn(err);
+      });
+  }
+
   var currentPolicyData  = null;
   var currentTravelData  = null;
   var ADVISOR_NAME       = 'Pei-lin';
@@ -1042,12 +1076,10 @@
   }
 
   // ── 頁面載入時讀取系統設定 ──
-  google.script.run
-    .withSuccessHandler(function(cfg) {
-      if (cfg && cfg['顧問姓名']) ADVISOR_NAME = cfg['顧問姓名'];
-      if (cfg && cfg['顧問LINE'])  ADVISOR_LINE = cfg['顧問LINE'];
-    })
-    .getSystemConfig();
+  gasCall('getSystemConfig', {}, function(cfg) {
+    if (cfg && cfg['顧問姓名']) ADVISOR_NAME = cfg['顧問姓名'];
+    if (cfg && cfg['顧問LINE'])  ADVISOR_LINE = cfg['顧問LINE'];
+  });
 
   // ══════════════════════════════════════════════
   // ★ 近期到期提醒（5天內）& 提前預警（45~51天）
@@ -1056,8 +1088,7 @@
   var earlyWarningCache = [];
 
   // 頁面載入完成後，一個請求同時取得兩個結果
-  google.script.run
-    .withSuccessHandler(function(result) {
+  gasCall('getExpiringLists', {}, function(result) {
       var hint = document.getElementById('expiryLoadingHint');
       if (hint) hint.style.display = 'none';
 
@@ -1075,12 +1106,10 @@
 
       renderExpiryAlert(result.urgent);
       renderEarlyWarning(result.warning);
-    })
-    .withFailureHandler(function() {
+    }, function() {
       var hint = document.getElementById('expiryLoadingHint');
       if (hint) hint.style.display = 'none';
-    })
-    .getExpiringLists();
+    });
 
   function renderExpiryAlert(list) {
     var area = document.getElementById('expiryAlertArea');
@@ -1153,13 +1182,10 @@
 
   function openDetailFromExpiry(policyNo) {
     document.getElementById('loading').style.display = 'block';
-    google.script.run
-      .withSuccessHandler(renderModal)
-      .withFailureHandler(function() {
+    gasCall('getPolicyDetails', { no: policyNo }, renderModal, function() {
         document.getElementById('loading').style.display = 'none';
         alert('讀取保單詳情失敗，請稍後再試。');
-      })
-      .getPolicyDetails(policyNo);
+      });
   }
 
   function toggleExpiryAlert() {
@@ -1179,8 +1205,7 @@
    * callback(salutation): 稱呼確定後的回呼，salutation 就是「建明哥」或「李建明」
    */
   function withNickname(insuredId, name, callback) {
-    google.script.run
-      .withSuccessHandler(function(result) {
+    gasCall('getCustomerNickname', { id: insuredId }, function(result) {
         if (result && result.nickname) {
           // 有稱呼 → 直接用
           callback(result.nickname);
@@ -1192,16 +1217,14 @@
           _nicknameCallback = function(salutation) {
             // 如果有填稱呼，存回後端
             if (salutation && salutation !== name) {
-              google.script.run.saveCustomerNickname(insuredId, salutation);
+              gasCall('saveCustomerNickname', { id: insuredId, nickname: salutation }, null, null);
             }
             callback(salutation);
           };
           // 讓輸入框自動聚焦
           setTimeout(function() { document.getElementById('nicknameInput').focus(); }, 100);
         }
-      })
-      .withFailureHandler(function() { callback(name); }) // 失敗時直接用姓名
-      .getCustomerNickname(insuredId);
+      }, function() { callback(name); }); // 失敗時直接用姓名
   }
 
   function nicknameConfirm() {
@@ -1233,25 +1256,22 @@
   function expiryQuickShare(encodedItem, policyNo) {
     var item = JSON.parse(decodeURIComponent(encodedItem));
     // 先標記已聯繫
-    google.script.run.updateRenewalStatus(policyNo, '已聯繫');
+    gasCall('updateRenewalStatus', { policyNo: policyNo, status: '已聯繫' }, null, null);
     updateExpiryRowStatus(policyNo, '已聯繫');
 
     // 查詢稱呼後組訊息
     withNickname(item.maskedId || '', item.name, function(salutation) {
-      google.script.run
-        .withSuccessHandler(function(data) {
+      gasCall('getPolicyDetails', { no: policyNo }, function(data) {
           var msg = buildPolicyMsg(salutation, item.type, item.plateNo,
             item.effectiveDate, item.expiry, item.premium,
             data ? data.details : []);
           shareViaLine(msg);
-        })
-        .getPolicyDetails(policyNo);
+        });
     });
   }
 
   function setRenewalStatus(policyNo, status) {
-    google.script.run
-      .withSuccessHandler(function(result) {
+    gasCall('updateRenewalStatus', { policyNo: policyNo, status: status }, function(result) {
         if (result && result.success) {
           if (status === '已續保' || status === '不續保' || status === '已過戶' || status === '已報廢') {
             removeExpiryRow(policyNo);
@@ -1259,8 +1279,7 @@
             updateExpiryRowStatus(policyNo, status);
           }
         }
-      })
-      .updateRenewalStatus(policyNo, status);
+      });
   }
 
   function updateExpiryRowStatus(policyNo, status) {
@@ -1354,12 +1373,11 @@
   function earlyWarnShare(encodedItem, policyNo) {
     var item = JSON.parse(decodeURIComponent(encodedItem));
     // 標記已聯繫
-    google.script.run.updateRenewalStatus(policyNo, '已聯繫');
+    gasCall('updateRenewalStatus', { policyNo: policyNo, status: '已聯繫' }, null, null);
     updateEarlyWarningStatus(policyNo, '已聯繫');
 
     withNickname(item.maskedId || '', item.name, function(salutation) {
-      google.script.run
-        .withSuccessHandler(function(data) {
+      gasCall('getPolicyDetails', { no: policyNo }, function(data) {
           var msg = "🌟【保單續保提前通知】🌟\n\n";
           msg += salutation + " 您好！\n\n";
           msg += "📋 您的以下保單將於 " + item.daysLeft + " 天後到期，請檢視原保單內容，後續我再傳送今年續保內容：\n";
@@ -1382,14 +1400,12 @@
           msg += "若有任何問題，請隨時回覆聯繫 " + ADVISOR_NAME + "！🙌";
           if (ADVISOR_LINE) msg += "\n📲 加入 LINE：https://line.me/ti/p/" + ADVISOR_LINE;
           shareViaLine(msg);
-        })
-        .getPolicyDetails(policyNo);
+        });
     });
   }
 
   function setEarlyWarningStatus(policyNo, status) {
-    google.script.run
-      .withSuccessHandler(function(result) {
+    gasCall('updateRenewalStatus', { policyNo: policyNo, status: status }, function(result) {
         if (result && result.success) {
           if (status === '已續保' || status === '不續保' || status === '已過戶' || status === '已報廢') {
             removeEarlyWarningRow(policyNo);
@@ -1397,8 +1413,7 @@
             updateEarlyWarningStatus(policyNo, status);
           }
         }
-      })
-      .updateRenewalStatus(policyNo, status);
+      });
   }
 
   function updateEarlyWarningStatus(policyNo, status) {
@@ -1437,7 +1452,7 @@
     if (!val) return alert('請輸入搜尋條件');
     document.getElementById('loading').style.display = 'block';
     document.getElementById('resultsList').innerHTML = '';
-    google.script.run.withSuccessHandler(showResults).searchPolicies(val);
+    gasCall('searchPolicies', { q: val }, showResults);
   }
 
   function showResults(data) {
@@ -1478,13 +1493,10 @@
   function loadUncoveredList() {
     document.getElementById('loading').style.display = 'block';
     document.getElementById('resultsList').innerHTML = '';
-    google.script.run
-      .withSuccessHandler(showUncoveredList)
-      .withFailureHandler(function(e) {
+    gasCall('getUncoveredList', {}, showUncoveredList, function() {
         document.getElementById('loading').style.display = 'none';
         document.getElementById('resultsList').innerHTML = '<p style="text-align:center;color:#d32f2f;">讀取失敗，請先執行「比對旅平卡覆蓋率」</p>';
-      })
-      .getUncoveredList();
+      });
   }
 
   function showUncoveredList(result) {
@@ -1577,7 +1589,7 @@
     if (!val) return alert('請輸入搜尋條件');
     document.getElementById('loading').style.display = 'block';
     document.getElementById('resultsList').innerHTML = '';
-    google.script.run.withSuccessHandler(showTravelResults).searchTravelCards(val);
+    gasCall('searchTravelCards', { q: val }, showTravelResults);
   }
 
   function showTravelResults(data) {
@@ -1619,7 +1631,7 @@
   // ── 產險 Modal ──
   function openDetail(no) {
     document.getElementById('loading').style.display = 'block';
-    google.script.run.withSuccessHandler(renderModal).getPolicyDetails(no);
+    gasCall('getPolicyDetails', { no: no }, renderModal);
   }
 
   function renderModal(data) {
@@ -1660,9 +1672,7 @@
         '<div style="font-size:13px;color:#FF9800;font-weight:bold;">🏖️ 旅平卡狀態</div>' +
         '<div style="font-size:12px;color:#aaa;margin-top:4px;">查詢中...</div>' +
       '</div>';
-    google.script.run
-      .withSuccessHandler(renderTravelStatus)
-      .checkTravelCoverage(main.maskedId);
+    gasCall('checkTravelCoverage', { id: main.maskedId }, renderTravelStatus);
 
     if (main.familyId && main.familyId !== "無") {
       document.getElementById('familyReportArea').innerHTML =
@@ -1714,13 +1724,13 @@
 
   function loadFamilyReport(familyId) {
     document.getElementById('familyReportArea').querySelector('button').textContent = '載入中...';
-    google.script.run.withSuccessHandler(renderFamilyReport).getFamilyReport(familyId);
+    gasCall('getFamilyReport', { id: familyId }, renderFamilyReport);
   }
 
   // ── 旅平卡 Modal ──
   function openTravelDetail(certNo) {
     document.getElementById('loading').style.display = 'block';
-    google.script.run.withSuccessHandler(renderTravelModal).getTravelCardDetails(certNo);
+    gasCall('getTravelCardDetails', { no: certNo }, renderTravelModal);
   }
 
   function renderTravelModal(data) {
@@ -1947,16 +1957,13 @@
   function quickShare(name, type, policyNo, effectiveDate, expiry, plateNo, premium, maskedId) {
     withNickname(maskedId || '', name, function(salutation) {
       document.getElementById('loading').style.display = 'block';
-      google.script.run
-        .withSuccessHandler(function(data) {
+      gasCall('getPolicyDetails', { no: policyNo }, function(data) {
           document.getElementById('loading').style.display = 'none';
           shareViaLine(buildPolicyMsg(salutation, type, plateNo, effectiveDate, expiry, premium, data ? data.details : []));
-        })
-        .withFailureHandler(function() {
+        }, function() {
           document.getElementById('loading').style.display = 'none';
           shareViaLine(buildPolicyMsg(salutation, type, plateNo, effectiveDate, expiry, premium, []));
-        })
-        .getPolicyDetails(policyNo);
+        });
     });
   }
 
@@ -2061,16 +2068,14 @@
     var name     = currentPolicyData.main.insuredName;
     var label    = status === '已過戶' ? '已過戶 🔄' : '已報廢 🗑️';
     if (!confirm('確定將「' + name + '」的保單標記為【' + label + '】？\n\n此保單將不再出現在到期提醒名單中。')) return;
-    google.script.run
-      .withSuccessHandler(function(result) {
+    gasCall('updateRenewalStatus', { policyNo: policyNo, status: status }, function(result) {
         if (result && result.success) {
           alert('✅ 已標記為【' + label + '】');
           closeModal();
         } else {
           alert('❌ 標記失敗，請稍後再試。');
         }
-      })
-      .updateRenewalStatus(policyNo, status);
+      });
   }
 
   function closeModal() {
