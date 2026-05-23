@@ -115,12 +115,14 @@
 
     .search-row {
       display: flex;
-      gap: 12px;
+      gap: 8px;
+      overflow: hidden;
     }
 
     input[type="text"] {
       flex: 1;
-      padding: 12px 16px;
+      min-width: 0;
+      padding: 12px 12px;
       font-size: 15px;
       border: 1px solid #cbd5e1;
       border-radius: 10px;
@@ -159,14 +161,15 @@
     }
 
     .btn-search {
-      padding: 12px 24px;
-      font-size: 15px;
+      padding: 12px 16px;
+      font-size: 14px;
       border: none;
       color: white;
       border-radius: 10px;
       cursor: pointer;
       font-weight: 600;
       white-space: nowrap;
+      flex-shrink: 0;
       transition: var(--transition);
     }
 
@@ -1574,12 +1577,15 @@
       }
 
       html += "<div class='card' onclick='openDetail(\"" + item.policyNo + "\")'>" +
-        "<div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;'>" +
-          "<div class='card-title' style='margin-bottom:0;padding-right:10px;'>" + item.name + " (" + item.type + ")" + agentTag + "</div>" +
-          "<div style='display:flex;gap:6px;align-items:center;flex-wrap:wrap;'>" +
-            daysHtml +
-            "<div class='status-badge'>" + item.status + "</div>" +
+        "<div style='margin-bottom:10px;'>" +
+          "<div style='display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:6px;'>" +
+            "<div class='card-title' style='margin-bottom:0;font-size:16px;flex:1;min-width:0;word-break:break-word;'>" + item.name + agentTag + "</div>" +
+            "<div style='display:flex;gap:4px;align-items:center;flex-shrink:0;'>" +
+              daysHtml +
+              "<div class='status-badge'>" + item.status + "</div>" +
+            "</div>" +
           "</div>" +
+          "<div style='font-size:13px;color:#64748b;font-weight:500;'>" + item.type + "</div>" +
         "</div>" +
         "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px;'>" +
           "<div><div style='color:#00A3E0;font-size:13px;font-weight:bold;margin-bottom:6px;'>👤 被保人資訊</div>" +
