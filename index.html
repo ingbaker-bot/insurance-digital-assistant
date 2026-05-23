@@ -2407,37 +2407,103 @@
 
   // ── 代辦進度更新（展開式內嵌 UI，不用 prompt）──
   function openTaskUpdate(taskId, currentStatus, currentNote) {
-    // 找到該代辦的容器，展開內嵌輸入區
     var containerId = 'taskUpdate_' + taskId;
     var existing = document.getElementById(containerId);
-    if (existing) { existing.style.display = existing.style.display === 'none' ? 'block' : 'none'; return; }
-    // 找到更新按鈕的父容器（btn row div），在其後插入
+    if (existing) {
+      existing.style.display = existing.style.display === 'none' ? 'block' : 'none';
+      return;
+    }
     var btnRow = document.querySelector('[data-task-id="' + taskId + '"]');
     if (!btnRow) return;
+
     var div = document.createElement('div');
     div.id = containerId;
     div.style.cssText = 'margin-top:8px;background:#f8fafc;border-radius:10px;padding:12px;border:1px solid #e2e8f0;';
+
+    // 建立內嵌 UI：狀態選擇 + 備註欄 + 儲存/取消
     div.innerHTML =
       '<div style="font-size:12px;color:#64748b;margin-bottom:8px;font-weight:600;">更新處理進度</div>' +
-      '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">' +
-        '<button onclick="setTaskStatus(\'' + taskId + '\',\'處理中\',\'' + containerId + '\')" style="flex:1;min-width:70px;padding:7px 4px;background:#fef9c3;color:#854d0e;border:1px solid #fde68a;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">🔄 處理中</button>' +
-        '<button onclick="setTaskStatus(\'' + taskId + '\',\'已完成\',\'' + containerId + '\')" style="flex:1;min-width:70px;padding:7px 4px;background:#dcfce7;color:#166534;border:1px solid #86efac;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">✅ 已完成</button>' +
-        '<button onclick="setTaskStatus(\'' + taskId + '\',\'\',\'' + containerId + '\')" style="flex:1;min-width:70px;padding:7px 4px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">↩ 重設</button>' +
+
+      // ── 狀態選擇（點擊後 highlight，不直接儲存）──
+      '<div id="statusBtns_' + taskId + '" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">' +
+        '<button id="stBtn_處理中_' + taskId + '" onclick="selectTaskStatus('' + taskId + '','處理中')" ' +
+          'style="flex:1;min-width:70px;padding:7px 4px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;' +
+          (currentStatus === '處理中' ? 'background:#fde68a;color:#854d0e;border:2px solid #f59e0b;' : 'background:#fef9c3;color:#854d0e;border:1px solid #fde68a;') +
+          '">🔄 處理中</button>' +
+        '<button id="stBtn_已完成_' + taskId + '" onclick="selectTaskStatus('' + taskId + '','已完成')" ' +
+          'style="flex:1;min-width:70px;padding:7px 4px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;' +
+          (currentStatus === '已完成' ? 'background:#86efac;color:#166534;border:2px solid #16a34a;' : 'background:#dcfce7;color:#166534;border:1px solid #86efac;') +
+          '">✅ 已完成</button>' +
+        '<button id="stBtn__' + taskId + '" onclick="selectTaskStatus('' + taskId + '','')" ' +
+          'style="flex:1;min-width:70px;padding:7px 4px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;' +
+          (!currentStatus ? 'background:#e2e8f0;color:#334155;border:2px solid #94a3b8;' : 'background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;') +
+          '">↩ 重設</button>' +
       '</div>' +
-      '<input type="text" id="taskNote_' + taskId + '" placeholder="備註說明（可留空）" value="' + (currentNote||'').replace(/"/g,'&quot;') + '" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;">' +
-      '<div style="display:flex;gap:6px;margin-top:8px;">' +
-        '<button onclick="document.getElementById(\'' + containerId + '\').style.display=\'none\'" style="flex:1;padding:8px;background:#f1f5f9;color:#64748b;border:none;border-radius:8px;font-size:13px;cursor:pointer;">取消</button>' +
+
+      // ── 備註輸入欄 ──
+      '<input type="text" id="taskNote_' + taskId + '" placeholder="備註說明（可留空）" ' +
+        'value="' + (currentNote||'').replace(/"/g,'&quot;') + '" ' +
+        'style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:10px;">' +
+
+      // ── 儲存 + 取消 ──
+      '<div style="display:flex;gap:8px;">' +
+        '<button onclick="saveTaskUpdate('' + taskId + '','' + containerId + '')" ' +
+          'style="flex:2;padding:10px;background:#0284c7;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">💾 儲存</button>' +
+        '<button onclick="document.getElementById('' + containerId + '').style.display='none'" ' +
+          'style="flex:1;padding:10px;background:#f1f5f9;color:#64748b;border:none;border-radius:8px;font-size:14px;cursor:pointer;">取消</button>' +
       '</div>';
+
     btnRow.parentNode.insertBefore(div, btnRow.nextSibling);
+
+    // 記錄目前選取的狀態（預設為目前狀態）
+    div._selectedStatus = currentStatus || '';
   }
 
-  function setTaskStatus(taskId, newStatus, containerId) {
-    var noteEl = document.getElementById('taskNote_' + taskId);
-    var note   = noteEl ? noteEl.value.trim() : '';
+  // 點狀態按鈕 → 只做視覺 highlight，不儲存
+  function selectTaskStatus(taskId, status) {
+    var panel = document.getElementById('taskUpdate_' + taskId);
+    if (!panel) return;
+    panel._selectedStatus = status;
+
+    var statuses = ['處理中', '已完成', ''];
+    var activeStyles = {
+      '處理中': 'background:#fde68a;color:#854d0e;border:2px solid #f59e0b;',
+      '已完成': 'background:#86efac;color:#166534;border:2px solid #16a34a;',
+      '':       'background:#e2e8f0;color:#334155;border:2px solid #94a3b8;'
+    };
+    var inactiveStyles = {
+      '處理中': 'background:#fef9c3;color:#854d0e;border:1px solid #fde68a;',
+      '已完成': 'background:#dcfce7;color:#166534;border:1px solid #86efac;',
+      '':       'background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;'
+    };
+    statuses.forEach(function(s) {
+      var btn = document.getElementById('stBtn_' + s + '_' + taskId);
+      if (btn) btn.style.cssText = 'flex:1;min-width:70px;padding:7px 4px;border-radius:8px;font-size:13px;font-weight:' + (s === '' ? '600' : '700') + ';cursor:pointer;' +
+        (s === status ? activeStyles[s] : inactiveStyles[s]);
+    });
+  }
+
+  // 點「💾 儲存」→ 讀取目前選取狀態 + 備註，寫回 Sheets
+  function saveTaskUpdate(taskId, containerId) {
+    var panel     = document.getElementById(containerId);
+    var newStatus = panel ? (panel._selectedStatus !== undefined ? panel._selectedStatus : '') : '';
+    var noteEl    = document.getElementById('taskNote_' + taskId);
+    var note      = noteEl ? noteEl.value.trim() : '';
+
+    var saveBtn = panel ? panel.querySelector('button') : null;
+    if (saveBtn) { saveBtn.textContent = '儲存中...'; saveBtn.disabled = true; }
+
     gasCall('updateTask', { taskId: taskId, status: newStatus, note: note }, function(result) {
-      if (result && result.success) { loadTasks(); }
-      else { alert('更新失敗，請稍後再試'); }
-    }, null);
+      if (result && result.success) {
+        loadTasks();
+      } else {
+        if (saveBtn) { saveBtn.textContent = '💾 儲存'; saveBtn.disabled = false; }
+        alert('儲存失敗，請稍後再試');
+      }
+    }, function() {
+      if (saveBtn) { saveBtn.textContent = '💾 儲存'; saveBtn.disabled = false; }
+      alert('連線失敗，請重試');
+    });
   }
 
   function clearTaskDone(taskId) {
