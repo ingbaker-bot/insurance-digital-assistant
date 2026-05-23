@@ -905,6 +905,26 @@
 <div class="container">
   <h2>產險保單數位特助</h2>
 
+  <!-- ★ 代辦清單面板（收折式） -->
+  <div style="margin-bottom:12px;">
+    <button onclick="toggleTaskPanel()" style="width:100%;background:white;border:1px solid #e2e8f0;border-radius:12px;padding:11px 16px;font-size:14px;font-weight:600;color:#475569;cursor:pointer;display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+      <span>📋 共用代辦清單</span>
+      <span style="font-size:12px;color:#94a3b8;">點擊展開 ▼</span>
+    </button>
+    <div id="taskPanel" style="display:none;background:white;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;padding:16px;box-shadow:0 4px 8px rgba(0,0,0,0.05);">
+      <!-- 新增代辦輸入 -->
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <input type="date" id="taskDate" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;flex:0 0 140px;">
+        <input type="text" id="taskContent" placeholder="代辦內容..." style="flex:1;min-width:120px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;">
+        <button id="taskSubmitBtn" onclick="submitTask()" style="background:#0284c7;color:white;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">➕ 新增</button>
+      </div>
+      <!-- 代辦列表 -->
+      <div id="taskListBody" style="max-height:220px;overflow-y:auto;">
+        <div style="color:#999;font-size:13px;text-align:center;padding:10px;">點擊展開後載入...</div>
+      </div>
+    </div>
+  </div>
+
   <!-- 近期到期提醒（頁面載入時自動查詢） -->
   <div id="expiryLoadingHint" style="
     background:#FFF8E1;border:1px solid #FFE082;border-radius:10px;
@@ -952,6 +972,11 @@
     <button onclick="loadUncoveredList()"
       style="width:100%;padding:11px;margin-top:4px;background:#E65100;color:white;border:none;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">
       ❌ 查看未申辦旅平卡名單
+    </button>
+    <!-- 無住宅火險缺口按鈕 -->
+    <button onclick="loadFireGapList()"
+      style="width:100%;padding:11px;margin-top:8px;background:#FF9800;color:white;border:none;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">
+      🏠 查看無住宅火險名單
     </button>
   </div>
 
@@ -1004,6 +1029,7 @@
     <div class="btn-group" id="travelActionButtons">
       <button class="btn-action bg-img"    onclick="generateTravelImageCard()">🖼️ 製作旅平卡圖卡</button>
       <button class="btn-action bg-travel" onclick="shareTravelCard()">💬 分享旅平卡資訊</button>
+      <button class="btn-action" style="background:#FF9800;color:white;" onclick="shareTravelRecommend()">🏖️ 推薦旅平卡話術</button>
       <button class="btn-action bg-close"  onclick="closeTravelModal()">關閉返回</button>
     </div>
   </div>
@@ -1144,7 +1170,12 @@
       renderEarlyWarning(result.warning);
     }, function() {
       var hint = document.getElementById('expiryLoadingHint');
-      if (hint) hint.style.display = 'none';
+      if (hint) {
+        hint.style.background = '#FFF3E0';
+        hint.style.borderColor = '#FFB74D';
+        hint.style.color = '#E65100';
+        hint.innerHTML = '⚠️ 到期提醒載入逾時，請重新整理頁面。若持續發生請確認網路連線。';
+      }
     });
 
   function renderExpiryAlert(list) {
@@ -1495,14 +1526,37 @@
     document.getElementById('loading').style.display = 'none';
     var list = document.getElementById('resultsList');
     if (!data || data.length === 0) { list.innerHTML = '<p style="text-align:center;color:#888;">查無資料。</p>'; return; }
+    var today = new Date(); today.setHours(0,0,0,0);
     var html = '';
     data.forEach(function(item) {
       var agentTag = item.agentCode && item.agentCode !== "無" ? " <span style='color:#FF9800;'>[" + item.agentCode + "]</span>" : "";
+
+      // ── 計算剩餘天數 ──
+      var daysLeft = null;
+      var daysHtml = '';
+      if (item.expiry && item.expiry !== '無') {
+        var parts = item.expiry.split('/');
+        if (parts.length === 3) {
+          var y = parseInt(parts[0]); if (y < 1911) y += 1911;
+          var exp = new Date(y, parseInt(parts[1]) - 1, parseInt(parts[2]));
+          daysLeft = Math.ceil((exp - today) / 86400000);
+          var dayColor = daysLeft <= 5  ? '#b91c1c' :
+                         daysLeft <= 30 ? '#c2410c' :
+                         daysLeft <= 60 ? '#b45309' : '#047857';
+          var dayBg    = daysLeft <= 5  ? '#fef2f2' :
+                         daysLeft <= 30 ? '#fff7ed' :
+                         daysLeft <= 60 ? '#fef9c3' : '#ecfdf5';
+          daysHtml = daysLeft < 0
+            ? "<span style='background:#f1f5f9;color:#64748b;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;'>已到期</span>"
+            : "<span style='background:" + dayBg + ";color:" + dayColor + ";font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;'>剩 " + daysLeft + " 天</span>";
+        }
+      }
+
       html += "<div class='card' onclick='openDetail(\"" + item.policyNo + "\")'>" +
         "<div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;'>" +
           "<div class='card-title' style='margin-bottom:0;padding-right:10px;'>" + item.name + " (" + item.type + ")" + agentTag + "</div>" +
           "<div style='display:flex;gap:6px;align-items:center;white-space:nowrap;'>" +
-            "<button onclick='event.stopPropagation();window.print()' style='background:#607D8B;color:white;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;'>🖨️ 列印</button>" +
+            daysHtml +
             "<div class='status-badge'>" + item.status + "</div>" +
           "</div>" +
         "</div>" +
@@ -1516,8 +1570,9 @@
             "<div class='card-info'>電話: " + item.applicantPhone + "</div>" +
             "<div class='card-info' style='white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' title='" + item.address + "'>🏠 地址: " + item.address + "</div></div>" +
         "</div>" +
-        "<div style='padding-top:12px;border-top:1px dashed #eee;'>" +
-          "<button onclick='event.stopPropagation();quickShare(\"" + item.name + "\",\"" + item.type + "\",\"" + item.policyNo + "\",\"" + item.effectiveDate + "\",\"" + item.expiry + "\",\"" + item.plateNo + "\",\"" + item.premium + "\",\"" + item.maskedId + "\")' style='width:100%;background:#00B900;color:white;border:none;padding:10px;border-radius:6px;font-weight:bold;font-size:15px;cursor:pointer;'>💬 傳送到期提醒</button>" +
+        "<div style='display:flex;gap:8px;padding-top:12px;border-top:1px dashed #eee;'>" +
+          "<button onclick='event.stopPropagation();openDetail(\"" + item.policyNo + "\")' style='flex:1;background:#0284c7;color:white;border:none;padding:10px;border-radius:6px;font-weight:bold;font-size:14px;cursor:pointer;'>🔍 查看明細</button>" +
+          "<button onclick='event.stopPropagation();quickShare(\"" + item.name + "\",\"" + item.type + "\",\"" + item.policyNo + "\",\"" + item.effectiveDate + "\",\"" + item.expiry + "\",\"" + item.plateNo + "\",\"" + item.premium + "\",\"" + item.maskedId + "\")' style='flex:1;background:#00B900;color:white;border:none;padding:10px;border-radius:6px;font-weight:bold;font-size:14px;cursor:pointer;'>💬 傳到期提醒</button>" +
         "</div></div>";
     });
     list.innerHTML = html;
@@ -1996,9 +2051,12 @@
       gasCall('getPolicyDetails', { no: policyNo }, function(data) {
           document.getElementById('loading').style.display = 'none';
           shareViaLine(buildPolicyMsg(salutation, type, plateNo, effectiveDate, expiry, premium, data ? data.details : []));
+          // ── 分享後自動標記已聯繫 ──
+          gasCall('updateRenewalStatus', { policyNo: policyNo, status: '已聯繫' }, null, null);
         }, function() {
           document.getElementById('loading').style.display = 'none';
           shareViaLine(buildPolicyMsg(salutation, type, plateNo, effectiveDate, expiry, premium, []));
+          gasCall('updateRenewalStatus', { policyNo: policyNo, status: '已聯繫' }, null, null);
         });
     });
   }
@@ -2182,6 +2240,10 @@
       msg += "若有任何問題，請隨時回覆聯繫 " + ADVISOR_NAME + "！🙌";
       if (ADVISOR_LINE) msg += "\n📲 加入 LINE：https://line.me/ti/p/" + ADVISOR_LINE;
       shareViaLine(msg);
+      // ── 分享後自動標記已聯繫 ──
+      if (currentPolicyData && currentPolicyData.main && currentPolicyData.main.policyNo) {
+        gasCall('updateRenewalStatus', { policyNo: currentPolicyData.main.policyNo, status: '已聯繫' }, null, null);
+      }
     });
   }
 
@@ -2191,6 +2253,171 @@
     a.download = currentPolicyData.main.insuredName + '_保單摘要.jpg';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   }
-</script>
+
+  // ══════════════════════════════════════════════════════
+  // ★ 旅平卡 Modal 推薦話術按鈕
+  // ══════════════════════════════════════════════════════
+  function shareTravelRecommend() {
+    if (!currentTravelData) return;
+    var m = currentTravelData.main;
+    var targetName = m.appName || '您';
+    var msg = "🏖️【旅平卡推薦】\n\n";
+    msg += targetName + " 您好！我們注意到您目前尚未申辦旅平卡保障。\n\n";
+    msg += "富邦產險旅平卡保障內容包含：\n";
+    msg += "✅ 意外身故／失能保障\n";
+    msg += "✅ 海內外旅遊醫療費用\n";
+    msg += "✅ 海外突發疾病\n";
+    msg += "✅ 不便險（班機延誤、行李遺失等）\n\n";
+    msg += "旅平卡自動續卡、保障全家，一張搞定！🌏\n\n";
+    msg += "有興趣了解詳情，歡迎隨時聯繫 " + ADVISOR_NAME + "！🙌";
+    if (ADVISOR_LINE) msg += "\n📲 加入 LINE：https://line.me/ti/p/" + ADVISOR_LINE;
+    shareViaLine(msg);
+  }
+
+  // ══════════════════════════════════════════════════════
+  // ★ 無住宅火險名單
+  // ══════════════════════════════════════════════════════
+  function loadFireGapList() {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('resultsList').innerHTML = '';
+    gasCall('getFireInsuranceGap', {}, showFireGapList, function() {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('resultsList').innerHTML = '<p style="text-align:center;color:#d32f2f;">讀取失敗，請稍後再試</p>';
+    });
+  }
+
+  function showFireGapList(result) {
+    document.getElementById('loading').style.display = 'none';
+    var list = document.getElementById('resultsList');
+    if (!result || result.total === 0) {
+      list.innerHTML = '<p style="text-align:center;color:#2E7D32;font-weight:bold;">🎉 所有客戶都已有住宅火險！</p>';
+      return;
+    }
+    var html = '<div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:12px;padding:14px 16px;margin-bottom:16px;">' +
+      '<div style="color:#E65100;font-weight:bold;font-size:15px;">🏠 尚無住宅火險：共 ' + result.total + ' 人</div>' +
+      '<div style="font-size:12px;color:#888;margin-top:4px;">比對方式：身分證 + 地址雙重比對</div>' +
+      '</div>';
+    result.list.forEach(function(item) {
+      var encoded = encodeURIComponent(JSON.stringify({ name: item.name, applicant: item.applicant, address: item.address }));
+      html += '<div style="background:white;border-radius:12px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 6px rgba(0,0,0,0.06);border-left:4px solid #FF9800;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+          '<div style="font-weight:700;font-size:15px;color:#333;">' + item.name + '</div>' +
+          '<button onclick="recommendFire(\'' + encoded + '\')" style="background:#FF9800;color:white;border:none;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">🏠 推薦住火</button>' +
+        '</div>' +
+        '<div style="font-size:12px;color:#666;">' +
+          item.insType + '　到期：' + item.expiry +
+          (item.applicant && item.applicant !== item.name ? '　要保人：' + item.applicant : '') +
+        '</div>' +
+        (item.address && item.address !== '無' ? '<div style="font-size:11px;color:#999;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🏠 ' + item.address + '</div>' : '') +
+      '</div>';
+    });
+    list.innerHTML = html;
+  }
+
+  function recommendFire(encodedData) {
+    var data = JSON.parse(decodeURIComponent(encodedData));
+    var targetName = (data.applicant && data.applicant !== data.name) ? data.applicant : data.name;
+    var msg = "🏠【住宅火險推薦】\n\n";
+    msg += targetName + " 您好！\n\n";
+    msg += "我們注意到您目前系統中尚未有住宅火險的記錄。\n\n";
+    msg += "住宅火險的保障內容：\n";
+    msg += "✅ 火災、爆炸、閃電雷擊\n";
+    msg += "✅ 自然災害（颱風、洪水、地震附加）\n";
+    msg += "✅ 第三人責任保障\n";
+    msg += "✅ 臨時住所費用\n\n";
+    msg += "保費實惠，一年幾百元就能守護您的家！🏡\n\n";
+    msg += "有興趣了解詳情，歡迎隨時聯繫 " + ADVISOR_NAME + "！🙌";
+    if (ADVISOR_LINE) msg += "\n📲 加入 LINE：https://line.me/ti/p/" + ADVISOR_LINE;
+    shareViaLine(msg);
+  }
+
+  // ══════════════════════════════════════════════════════
+  // ★ 代辦清單（共用，存入 Google Sheets）
+  // ══════════════════════════════════════════════════════
+  var _tasks = [];
+
+  function loadTasks() {
+    gasCall('getTasks', {}, function(result) {
+      _tasks = (result && result.tasks) ? result.tasks : [];
+      renderTasks();
+    }, function() {
+      document.getElementById('taskListBody').innerHTML =
+        '<div style="color:#999;font-size:13px;text-align:center;padding:10px;">載入失敗，請稍後再試</div>';
+    });
+  }
+
+  function renderTasks() {
+    var body  = document.getElementById('taskListBody');
+    var today = new Date(); today.setHours(0,0,0,0);
+    if (!_tasks || _tasks.length === 0) {
+      body.innerHTML = '<div style="color:#999;font-size:13px;text-align:center;padding:10px;">目前沒有代辦事項</div>';
+      return;
+    }
+    var html = '';
+    _tasks.forEach(function(t) {
+      var badgeBg  = t.isToday ? '#FFF3E0' : t.isPast ? '#fef2f2' : '#f0fdf4';
+      var badgeClr = t.isToday ? '#E65100' : t.isPast ? '#b91c1c' : '#166534';
+      var badgeTxt = t.isToday ? '📌 今日' : t.isPast ? '⚠️ 已過期' : '📅 ' + t.date;
+      html += '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;">' +
+        '<div style="flex:1;">' +
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">' +
+            '<span style="background:' + badgeBg + ';color:' + badgeClr + ';font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;">' + badgeTxt + '</span>' +
+            (t.author ? '<span style="font-size:11px;color:#94a3b8;">' + t.author + '</span>' : '') +
+          '</div>' +
+          '<div style="font-size:14px;color:#1e293b;font-weight:500;">' + t.content + '</div>' +
+        '</div>' +
+        '<button onclick="deleteTaskItem(\'' + t.taskId + '\')" style="background:none;border:none;color:#cbd5e1;font-size:18px;cursor:pointer;padding:0 4px;flex-shrink:0;" title="刪除">✕</button>' +
+      '</div>';
+    });
+    body.innerHTML = html;
+  }
+
+  function submitTask() {
+    var date    = document.getElementById('taskDate').value.replace(/-/g, '/');
+    var content = document.getElementById('taskContent').value.trim();
+    if (!date || !content) { alert('請填寫日期和內容'); return; }
+    var btn = document.getElementById('taskSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = '儲存中...';
+    gasCall('saveTask', { date: date, content: content, author: ADVISOR_NAME }, function(result) {
+      btn.disabled = false;
+      btn.textContent = '➕ 新增';
+      if (result && result.success) {
+        document.getElementById('taskContent').value = '';
+        loadTasks();
+      } else {
+        alert('儲存失敗，請稍後再試');
+      }
+    }, function() {
+      btn.disabled = false;
+      btn.textContent = '➕ 新增';
+      alert('連線失敗，請稍後再試');
+    });
+  }
+
+  function deleteTaskItem(taskId) {
+    if (!confirm('確定刪除此代辦事項？')) return;
+    gasCall('deleteTask', { taskId: taskId }, function(result) {
+      if (result && result.success) {
+        _tasks = _tasks.filter(function(t) { return t.taskId !== taskId; });
+        renderTasks();
+      }
+    }, null);
+  }
+
+  function toggleTaskPanel() {
+    var panel = document.getElementById('taskPanel');
+    var isOpen = panel.style.display !== 'none';
+    panel.style.display = isOpen ? 'none' : 'block';
+    if (!isOpen) loadTasks();
+  }
+
+  // ══════════════════════════════════════════════════════
+  // ★ 逾時錯誤提示增強：包裝 gasCall 加全域逾時提示
+  // ══════════════════════════════════════════════════════
+  // gasCall 已在上方定義，逾時時 failFn 會被觸發
+  // 以下為頁面載入提示的錯誤補強（已在 gasCall timeout 回呼中處理）
+
+
 </body>
 </html>
