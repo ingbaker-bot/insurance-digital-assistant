@@ -2416,81 +2416,110 @@
     var btnRow = document.querySelector('[data-task-id="' + taskId + '"]');
     if (!btnRow) return;
 
-    var div = document.createElement('div');
-    div.id = containerId;
-    div.style.cssText = 'margin-top:8px;background:#f8fafc;border-radius:10px;padding:12px;border:1px solid #e2e8f0;';
+    // ── 建立面板容器 ──
+    var panel = document.createElement('div');
+    panel.id = containerId;
+    panel._selectedStatus = currentStatus || '';
+    panel.style.cssText = 'margin-top:8px;background:#f8fafc;border-radius:10px;padding:12px;border:1px solid #e2e8f0;';
 
-    // 建立內嵌 UI：狀態選擇 + 備註欄 + 儲存/取消
-    div.innerHTML =
-      '<div style="font-size:12px;color:#64748b;margin-bottom:8px;font-weight:600;">更新處理進度</div>' +
+    // ── 標題 ──
+    var title = document.createElement('div');
+    title.style.cssText = 'font-size:12px;color:#64748b;margin-bottom:8px;font-weight:600;';
+    title.textContent = '更新處理進度';
+    panel.appendChild(title);
 
-      // ── 狀態選擇（點擊後 highlight，不直接儲存）──
-      '<div id="statusBtns_' + taskId + '" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">' +
-        '<button id="stBtn_處理中_' + taskId + '" onclick="selectTaskStatus('' + taskId + '','處理中')" ' +
-          'style="flex:1;min-width:70px;padding:7px 4px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;' +
-          (currentStatus === '處理中' ? 'background:#fde68a;color:#854d0e;border:2px solid #f59e0b;' : 'background:#fef9c3;color:#854d0e;border:1px solid #fde68a;') +
-          '">🔄 處理中</button>' +
-        '<button id="stBtn_已完成_' + taskId + '" onclick="selectTaskStatus('' + taskId + '','已完成')" ' +
-          'style="flex:1;min-width:70px;padding:7px 4px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;' +
-          (currentStatus === '已完成' ? 'background:#86efac;color:#166534;border:2px solid #16a34a;' : 'background:#dcfce7;color:#166534;border:1px solid #86efac;') +
-          '">✅ 已完成</button>' +
-        '<button id="stBtn__' + taskId + '" onclick="selectTaskStatus('' + taskId + '','')" ' +
-          'style="flex:1;min-width:70px;padding:7px 4px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;' +
-          (!currentStatus ? 'background:#e2e8f0;color:#334155;border:2px solid #94a3b8;' : 'background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;') +
-          '">↩ 重設</button>' +
-      '</div>' +
+    // ── 狀態按鈕列 ──
+    var btnRow2 = document.createElement('div');
+    btnRow2.style.cssText = 'display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;';
 
-      // ── 備註輸入欄 ──
-      '<input type="text" id="taskNote_' + taskId + '" placeholder="備註說明（可留空）" ' +
-        'value="' + (currentNote||'').replace(/"/g,'&quot;') + '" ' +
-        'style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:10px;">' +
+    function makeStatusBtn(label, emoji, status, activeBg, activeBorder, activeClr, inactiveBg, inactiveBorder) {
+      var btn = document.createElement('button');
+      btn.id = 'stBtn_' + status + '_' + taskId;
+      btn.textContent = emoji + ' ' + label;
+      var isActive = (panel._selectedStatus === status);
+      btn.style.cssText = 'flex:1;min-width:70px;padding:7px 4px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;' +
+        (isActive
+          ? 'background:' + activeBg   + ';color:' + activeClr + ';border:2px solid ' + activeBorder + ';'
+          : 'background:' + inactiveBg + ';color:' + activeClr + ';border:1px solid ' + inactiveBorder + ';');
+      btn.onclick = function() { selectTaskStatus(taskId, status); };
+      return btn;
+    }
 
-      // ── 儲存 + 取消 ──
-      '<div style="display:flex;gap:8px;">' +
-        '<button onclick="saveTaskUpdate('' + taskId + '','' + containerId + '')" ' +
-          'style="flex:2;padding:10px;background:#0284c7;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">💾 儲存</button>' +
-        '<button onclick="document.getElementById('' + containerId + '').style.display='none'" ' +
-          'style="flex:1;padding:10px;background:#f1f5f9;color:#64748b;border:none;border-radius:8px;font-size:14px;cursor:pointer;">取消</button>' +
-      '</div>';
+    btnRow2.appendChild(makeStatusBtn('處理中','🔄','處理中','#fde68a','#f59e0b','#854d0e','#fef9c3','#fde68a'));
+    btnRow2.appendChild(makeStatusBtn('已完成','✅','已完成','#86efac','#16a34a','#166534','#dcfce7','#86efac'));
 
-    btnRow.parentNode.insertBefore(div, btnRow.nextSibling);
+    // 重設按鈕（標記為空字串）
+    var resetBtn = document.createElement('button');
+    resetBtn.id = 'stBtn__' + taskId;
+    resetBtn.textContent = '↩ 重設';
+    var isReset = (panel._selectedStatus === '');
+    resetBtn.style.cssText = 'flex:1;min-width:70px;padding:7px 4px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;' +
+      (isReset ? 'background:#e2e8f0;color:#334155;border:2px solid #94a3b8;' : 'background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;');
+    resetBtn.onclick = function() { selectTaskStatus(taskId, ''); };
+    btnRow2.appendChild(resetBtn);
 
-    // 記錄目前選取的狀態（預設為目前狀態）
-    div._selectedStatus = currentStatus || '';
+    panel.appendChild(btnRow2);
+
+    // ── 備註輸入欄 ──
+    var noteInput = document.createElement('input');
+    noteInput.type = 'text';
+    noteInput.id = 'taskNote_' + taskId;
+    noteInput.placeholder = '備註說明（可留空）';
+    noteInput.value = currentNote || '';
+    noteInput.style.cssText = 'width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:10px;';
+    panel.appendChild(noteInput);
+
+    // ── 儲存 + 取消 ──
+    var actionRow = document.createElement('div');
+    actionRow.style.cssText = 'display:flex;gap:8px;';
+
+    var saveBtn = document.createElement('button');
+    saveBtn.id = 'taskSaveBtn_' + taskId;
+    saveBtn.textContent = '💾 儲存';
+    saveBtn.style.cssText = 'flex:2;padding:10px;background:#0284c7;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;';
+    saveBtn.onclick = function() { saveTaskUpdate(taskId, containerId); };
+    actionRow.appendChild(saveBtn);
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.textContent = '取消';
+    cancelBtn.style.cssText = 'flex:1;padding:10px;background:#f1f5f9;color:#64748b;border:none;border-radius:8px;font-size:14px;cursor:pointer;';
+    cancelBtn.onclick = function() { panel.style.display = 'none'; };
+    actionRow.appendChild(cancelBtn);
+
+    panel.appendChild(actionRow);
+    btnRow.parentNode.insertBefore(panel, btnRow.nextSibling);
   }
 
-  // 點狀態按鈕 → 只做視覺 highlight，不儲存
+  // 點狀態按鈕 → 視覺 highlight，不儲存
   function selectTaskStatus(taskId, status) {
     var panel = document.getElementById('taskUpdate_' + taskId);
     if (!panel) return;
     panel._selectedStatus = status;
 
-    var statuses = ['處理中', '已完成', ''];
-    var activeStyles = {
-      '處理中': 'background:#fde68a;color:#854d0e;border:2px solid #f59e0b;',
-      '已完成': 'background:#86efac;color:#166534;border:2px solid #16a34a;',
-      '':       'background:#e2e8f0;color:#334155;border:2px solid #94a3b8;'
-    };
-    var inactiveStyles = {
-      '處理中': 'background:#fef9c3;color:#854d0e;border:1px solid #fde68a;',
-      '已完成': 'background:#dcfce7;color:#166534;border:1px solid #86efac;',
-      '':       'background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;'
-    };
-    statuses.forEach(function(s) {
-      var btn = document.getElementById('stBtn_' + s + '_' + taskId);
-      if (btn) btn.style.cssText = 'flex:1;min-width:70px;padding:7px 4px;border-radius:8px;font-size:13px;font-weight:' + (s === '' ? '600' : '700') + ';cursor:pointer;' +
-        (s === status ? activeStyles[s] : inactiveStyles[s]);
+    var configs = [
+      { key: '處理中', activeBg:'#fde68a', activeBorder:'#f59e0b', activeClr:'#854d0e', inactiveBg:'#fef9c3', inactiveBorder:'#fde68a', fw:'700' },
+      { key: '已完成', activeBg:'#86efac', activeBorder:'#16a34a', activeClr:'#166534', inactiveBg:'#dcfce7', inactiveBorder:'#86efac', fw:'700' },
+      { key: '',       activeBg:'#e2e8f0', activeBorder:'#94a3b8', activeClr:'#334155', inactiveBg:'#f1f5f9', inactiveBorder:'#e2e8f0', fw:'600' }
+    ];
+    configs.forEach(function(c) {
+      var btn = document.getElementById('stBtn_' + c.key + '_' + taskId);
+      if (!btn) return;
+      var isActive = (status === c.key);
+      btn.style.cssText = 'flex:1;min-width:70px;padding:7px 4px;border-radius:8px;font-size:13px;font-weight:' + c.fw + ';cursor:pointer;' +
+        (isActive
+          ? 'background:' + c.activeBg   + ';color:' + c.activeClr + ';border:2px solid ' + c.activeBorder + ';'
+          : 'background:' + c.inactiveBg + ';color:' + c.activeClr + ';border:1px solid ' + c.inactiveBorder + ';');
     });
   }
 
-  // 點「💾 儲存」→ 讀取目前選取狀態 + 備註，寫回 Sheets
+  // 點「💾 儲存」→ 寫回 Sheets
   function saveTaskUpdate(taskId, containerId) {
     var panel     = document.getElementById(containerId);
     var newStatus = panel ? (panel._selectedStatus !== undefined ? panel._selectedStatus : '') : '';
     var noteEl    = document.getElementById('taskNote_' + taskId);
     var note      = noteEl ? noteEl.value.trim() : '';
+    var saveBtn   = document.getElementById('taskSaveBtn_' + taskId);
 
-    var saveBtn = panel ? panel.querySelector('button') : null;
     if (saveBtn) { saveBtn.textContent = '儲存中...'; saveBtn.disabled = true; }
 
     gasCall('updateTask', { taskId: taskId, status: newStatus, note: note }, function(result) {
