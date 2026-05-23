@@ -1011,37 +1011,73 @@
 
 <script>
   // ══════════════════════════════════════════════════════
-  // ★ GAS API 設定（部署後請填入你的 Web App URL）
-  // 格式：https://script.google.com/macros/s/【你的部署ID】/exec
+  // ★ GAS API 設定（填入你的 Web App 部署 URL）
   // ══════════════════════════════════════════════════════
   var GAS_API_URL = 'https://script.google.com/macros/s/AKfycbybNkAAa6Tm5Ensf-Ly2wlHVEwBD-Wxyu0M4v7gnGHowuEILmKyHdpQ_q55nsS5gUfXUA/exec';
 
   /**
-   * 統一呼叫 GAS API 的輔助函式
-   * @param {string} action  - API action 名稱
-   * @param {object} params  - 額外參數 { q, no, id, policyNo, status, nickname }
+   * JSONP 呼叫 GAS API（解決 CORS 跨域問題）
+   * 用動態插入 <script> 標籤的方式繞過瀏覽器同源限制
+   *
+   * @param {string}   action    - API action 名稱
+   * @param {object}   params    - 額外參數
    * @param {function} successFn - 成功回呼 fn(data)
-   * @param {function} [failFn]  - 失敗回呼 fn(err)（可選）
+   * @param {function} [failFn]  - 失敗回呼（逾時時觸發）
+   * @param {number}   [timeout] - 逾時毫秒數，預設 20000
    */
-  function gasCall(action, params, successFn, failFn) {
-    var url = GAS_API_URL + '?action=' + encodeURIComponent(action);
+  var _gasCallSeq = 0; // callback 函式序號（防止同名衝突）
+
+  function gasCall(action, params, successFn, failFn, timeout) {
+    var cbName = '_gasCallback_' + (++_gasCallSeq);
+    var timer  = null;
+    var done   = false;
+
+    // 建立全域 callback 函式（JSONP 必須是全域）
+    window[cbName] = function(data) {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      // 清除 script 標籤和 callback
+      var el = document.getElementById(cbName);
+      if (el) el.parentNode.removeChild(el);
+      delete window[cbName];
+      if (successFn) successFn(data);
+    };
+
+    // 逾時處理
+    timer = setTimeout(function() {
+      if (done) return;
+      done = true;
+      var el = document.getElementById(cbName);
+      if (el) el.parentNode.removeChild(el);
+      delete window[cbName];
+      console.error('[gasCall timeout] action=' + action);
+      if (failFn) failFn(new Error('timeout'));
+    }, timeout || 25000);
+
+    // 組合 URL
+    var url = GAS_API_URL + '?action=' + encodeURIComponent(action) + '&callback=' + cbName;
     if (params) {
       Object.keys(params).forEach(function(k) {
-        url += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(params[k] || '');
+        url += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(params[k] !== undefined ? params[k] : '');
       });
     }
-    fetch(url)
-      .then(function(res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(function(data) {
-        if (successFn) successFn(data);
-      })
-      .catch(function(err) {
-        console.error('[gasCall] ' + action, err);
-        if (failFn) failFn(err);
-      });
+
+    // 動態插入 <script> 發出請求
+    var script = document.createElement('script');
+    script.id  = cbName;
+    script.src = url;
+    script.onerror = function() {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      var errEl = document.getElementById(cbName);
+      if (errEl) errEl.parentNode.removeChild(errEl);
+      delete window[cbName];
+      console.error('[gasCall error] action=' + action);
+      if (failFn) failFn(new Error('script load error'));
+    };
+    document.head.appendChild(script);
   }
 
   var currentPolicyData  = null;
