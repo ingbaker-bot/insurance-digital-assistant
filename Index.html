@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root {
+      --primary-color: #00A3E0;
+      --travel-color:  #FF7043;
+      --bg-color: #F5F7FA;
+      --card-bg: #FFFFFF;
+      --text-main: #333333;
+      --text-muted: #666666;
+      --line-color: #00B900;
+      --ai-color: #FF9800;
+    }
+    body { font-family: Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; }
+
+    /* ── Tab 切換 ── */
+    .tab-bar { display: flex; gap: 0; margin-bottom: 16px; border-radius: 10px; overflow: hidden; border: 1px solid #ddd; }
+    .tab-btn { flex: 1; padding: 12px; font-size: 15px; font-weight: bold; border: none; cursor: pointer; background: #f5f5f5; color: #888; transition: all 0.2s; }
+    .tab-btn.active-insurance { background: var(--primary-color); color: white; }
+    .tab-btn.active-travel    { background: var(--travel-color);  color: white; }
+
+    /* ── 搜尋框 ── */
+    .search-box { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+    .search-row { display: flex; gap: 10px; }
+    input[type="text"] { flex: 1; padding: 12px 15px; font-size: 16px; border: 1px solid #ddd; border-radius: 8px; background: white; }
+    .search-hint { font-size: 12px; color: #999; padding-left: 4px; }
+    .search-hint span { display: inline-block; background: #f0f0f0; border-radius: 4px; padding: 2px 6px; margin: 2px; }
+    .btn-search { padding: 12px 20px; font-size: 16px; border: none; color: white; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
+    .btn-insurance { background-color: var(--primary-color); }
+    .btn-travel    { background-color: var(--travel-color); }
+
+    /* ── 產險卡片 ── */
+    .card { background: var(--card-bg); border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 5px solid var(--primary-color); cursor: pointer; }
+    .card-title { font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--primary-color); }
+    .card-info { font-size: 14px; color: var(--text-muted); margin-bottom: 4px; }
+    .status-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; background: #E8F5E9; color: #2E7D32; }
+
+    /* ── 旅平卡卡片 ── */
+    .travel-card { background: var(--card-bg); border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 5px solid var(--travel-color); cursor: pointer; }
+    .travel-card-title { font-size: 17px; font-weight: bold; color: var(--travel-color); margin-bottom: 8px; }
+    .travel-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; background: #FBE9E7; color: #BF360C; font-weight: bold; }
+    .member-count-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; background: #E3F2FD; color: #1565C0; font-weight: bold; margin-left: 6px; }
+
+    #loading { display: none; text-align: center; color: var(--text-muted); margin: 20px 0; }
+
+    /* ── Modal 通用 ── */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: flex-end; z-index: 1000; }
+    .modal-content { background: white; width: 100%; max-width: 600px; border-radius: 20px 20px 0 0; padding: 25px 20px; max-height: 90vh; overflow-y: auto; box-sizing: border-box; }
+    #modalBody { background: white; padding: 10px; border-radius: 10px; }
+    .detail-section { margin-bottom: 20px; }
+    .detail-title { font-size: 16px; font-weight: bold; border-bottom: 2px solid var(--primary-color); padding-bottom: 5px; margin-bottom: 10px; }
+    .detail-title-travel { border-bottom-color: var(--travel-color); }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px; }
+    .info-label { color: var(--text-muted); font-size: 11px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+    th { background: #f8f9fa; padding: 8px; text-align: left; border-bottom: 1px solid #ddd; font-size: 12px; }
+    td { padding: 8px; border-bottom: 1px solid #eee; font-size: 13px; }
+
+    /* ── 按鈕群組 ── */
+    .btn-group { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+    .btn-action { flex: 1 1 45%; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-align: center; font-size: 14px; }
+    .bg-img    { background-color: var(--primary-color); }
+    .bg-ai     { background-color: var(--ai-color); }
+    .bg-line   { background-color: var(--line-color); }
+    .bg-close  { background-color: #f1f1f1; color: #333; }
+    .bg-travel { background-color: var(--travel-color); }
+    #generatedImage { max-width: 100%; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 15px; }
+
+    /* ── 家庭總覽 ── */
+    .family-header { margin-top: 24px; border-top: 3px double #eee; padding-top: 20px; }
+    .family-summary-bar { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 16px; }
+    .summary-chip  { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+    .chip-urgent   { background: #FFEBEE; color: #C62828; }
+    .chip-warning  { background: #FFF3E0; color: #E65100; }
+    .chip-ok       { background: #E8F5E9; color: #2E7D32; }
+    .chip-expired  { background: #F5F5F5; color: #9E9E9E; }
+    .member-card   { border: 1px solid #eee; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+    .member-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #F8F9FA; border-bottom: 1px solid #eee; }
+    .member-name   { font-weight: bold; font-size: 15px; color: #333; }
+    .member-relation { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: #E3F2FD; color: #1565C0; font-weight: bold; }
+    .member-share-btn { font-size: 12px; padding: 4px 10px; background: var(--line-color); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; white-space: nowrap; }
+    .policy-row    { display: flex; align-items: center; padding: 9px 14px; gap: 8px; border-bottom: 1px solid #f5f5f5; font-size: 13px; }
+    .policy-row:last-child { border-bottom: none; }
+    .urgency-dot   { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .dot-urgent { background: #E53935; } .dot-warning { background: #FB8C00; }
+    .dot-ok     { background: #43A047; } .dot-expired { background: #BDBDBD; }
+    .policy-type   { flex: 1; color: #333; }
+    .policy-plate  { color: #888; font-size: 12px; min-width: 60px; }
+    .policy-expiry { font-size: 12px; min-width: 72px; text-align: right; }
+    .expiry-urgent  { color: #C62828; font-weight: bold; }
+    .expiry-warning { color: #E65100; font-weight: bold; }
+    .expiry-ok      { color: #2E7D32; }
+    .expiry-expired { color: #9E9E9E; }
+    .days-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: bold; min-width: 44px; text-align: center; }
+    .days-urgent  { background: #FFEBEE; color: #C62828; }
+    .days-warning { background: #FFF3E0; color: #E65100; }
+    .days-ok      { background: #E8F5E9; color: #2E7D32; }
+    .days-expired { background: #F5F5F5; color: #9E9E9E; }
+    .family-share-btn { flex: 1; padding: 12px; background: var(--line-color); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; margin-top: 8px; word-break: keep-all; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .peilin-note { background-color: #FFF9C4; border-radius: 12px; padding: 15px; margin-top: 16px; border-left: 5px solid #FBC02D; font-style: italic; line-height: 1.6; color: #5D4037; font-size: 14px; position: relative; }
+    .peilin-note::before { content: '🌸'; position: absolute; top: -10px; left: -10px; font-size: 20px; }
+
+    /* ── 旅平卡被保人名冊表格 ── */
+    .travel-member-table th { background: #FBE9E7; color: #BF360C; }
+    .travel-member-table tr:nth-child(even) { background: #FFF8F6; }
+    .relation-badge { display: inline-block; padding: 1px 7px; border-radius: 8px; font-size: 11px; background: #E3F2FD; color: #1565C0; font-weight: bold; }
+
+    /* ── 未申辦名單 ── */
+    .uncovered-card { background: white; border-radius: 10px; padding: 14px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); border-left: 5px solid #E65100; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .uncovered-info { flex: 1; }
+    .uncovered-name { font-size: 16px; font-weight: bold; color: #333; margin-bottom: 4px; }
+    .uncovered-detail { font-size: 12px; color: #888; }
+    .uncovered-recommend-btn { background: #00B900; color: white; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: bold; cursor: pointer; white-space: nowrap; }
+    .uncovered-header { background: #FBE9E7; border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .uncovered-search { width: 100%; padding: 10px 14px; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 12px; box-sizing: border-box; }
+
+    /* ── 近期到期提醒 ── */
+    .expiry-alert-bar { border-radius: 10px; margin-bottom: 14px; overflow: hidden; border: 1px solid #FFCCBC; }
+    .expiry-alert-header { display: flex; justify-content: space-between; align-items: center; padding: 11px 16px; background: #FFF3E0; cursor: pointer; user-select: none; }
+    .expiry-alert-title { font-weight: bold; font-size: 14px; color: #E65100; }
+    .expiry-alert-badge { background: #E53935; color: white; border-radius: 12px; padding: 2px 10px; font-size: 12px; font-weight: bold; }
+    .expiry-alert-body { display: none; background: white; }
+    .expiry-alert-body.open { display: block; }
+    .expiry-row { padding: 12px 14px; border-top: 1px solid #FFF3E0; }
+    .expiry-row-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .expiry-name { font-weight: bold; font-size: 15px; color: #333; }
+    .expiry-days-badge { font-size: 12px; font-weight: bold; padding: 2px 10px; border-radius: 10px; }
+    .days-1 { background: #FFEBEE; color: #C62828; }
+    .days-2 { background: #FFEBEE; color: #C62828; }
+    .days-3 { background: #FFF3E0; color: #E65100; }
+    .days-4 { background: #FFF3E0; color: #E65100; }
+    .days-5 { background: #FFF8E1; color: #F57F17; }
+    .expiry-info { font-size: 12px; color: #888; margin-bottom: 8px; }
+    .expiry-status-contacted { font-size: 11px; background: #FFF3E0; color: #E65100; padding: 2px 8px; border-radius: 6px; display: inline-block; margin-bottom: 6px; }
+    .expiry-btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .expiry-btn { font-size: 12px; padding: 5px 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .btn-send    { background: #00B900; color: white; }
+    .btn-contact { background: #FF9800; color: white; }
+    .btn-done    { background: #43A047; color: white; }
+    .btn-skip    { background: #9E9E9E; color: white; }
+    .btn-transfer{ background: #1565C0; color: white; }
+    .btn-scrap   { background: #4E342E; color: white; }
+
+    /* ── 稱呼輸入彈窗 ── */
+    .nickname-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:3000; justify-content:center; align-items:center; }
+    .nickname-overlay.show { display:flex; }
+    .nickname-box { background:white; border-radius:16px; padding:24px 20px; width:88%; max-width:360px; box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+    .nickname-title { font-size:16px; font-weight:bold; color:#333; margin-bottom:6px; }
+    .nickname-sub { font-size:13px; color:#888; margin-bottom:14px; }
+    .nickname-input { width:100%; padding:11px 14px; font-size:16px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; margin-bottom:14px; }
+    .nickname-btn-row { display:flex; gap:10px; }
+    .nickname-btn-skip { flex:1; padding:11px; background:#f5f5f5; color:#666; border:none; border-radius:8px; font-size:14px; font-weight:bold; cursor:pointer; }
+    .nickname-btn-send { flex:2; padding:11px; background:#00B900; color:white; border:none; border-radius:8px; font-size:14px; font-weight:bold; cursor:pointer; }
+
+    @media print {
+      h2, .tab-bar, .search-box, button, .btn-group, #loading { display: none !important; }
+      body { background: white !important; padding: 0; margin: 0; }
+      .card, .travel-card { box-shadow: none !important; margin-bottom: 20px !important; page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h2>產險保單數位特助</h2>
+
+  <!-- 近期到期提醒（頁面載入時自動查詢） -->
+  <div id="expiryLoadingHint" style="
+    background:#FFF8E1;border:1px solid #FFE082;border-radius:10px;
+    padding:11px 16px;margin-bottom:8px;font-size:13px;color:#F57F17;
+    display:flex;align-items:center;gap:8px;">
+    ⏳ 載入到期提醒中...
+  </div>
+  <div id="expiryAlertArea"></div>
+
+  <!-- 45~51 天預警（頁面載入時自動查詢） -->
+  <div id="earlyWarningArea"></div>
+
+  <!-- Tab 切換 -->
+  <div class="tab-bar">
+    <button class="tab-btn active-insurance" id="tabInsurance" onclick="switchTab('insurance')">🚗 產險保單</button>
+    <button class="tab-btn" id="tabTravel" onclick="switchTab('travel')">🏖️ 旅平卡</button>
+  </div>
+
+  <!-- 產險搜尋區 -->
+  <div id="insuranceSearch">
+    <div class="search-box">
+      <div class="search-row">
+        <input type="text" id="smartSearch" placeholder="搜尋姓名、車牌、到期月份、電話、險種..." onkeypress="handleEnterInsurance(event)">
+        <button class="btn-search btn-insurance" onclick="handleSearch()">🔍 搜尋</button>
+      </div>
+      <div class="search-hint">
+        💡 可混合輸入：
+        <span>李 11507</span><span>機車 115</span><span>ABC-1234</span><span>0912345678</span><span>FAM-A11660</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 旅平卡搜尋區 -->
+  <div id="travelSearch" style="display:none;">
+    <div class="search-box">
+      <div class="search-row">
+        <input type="text" id="travelSearchInput" placeholder="搜尋要保人/被保人姓名、身分證、電話..." onkeypress="handleEnterTravel(event)">
+        <button class="btn-search btn-travel" onclick="handleTravelSearch()">🔍 搜尋</button>
+      </div>
+      <div class="search-hint">
+        💡 可搜尋：<span>要保人姓名</span><span>被保人姓名</span><span>身分證號</span><span>電話</span><span>憑證號碼</span>
+      </div>
+    </div>
+    <!-- 未申辦名單按鈕 -->
+    <button onclick="loadUncoveredList()"
+      style="width:100%;padding:11px;margin-top:4px;background:#E65100;color:white;border:none;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">
+      ❌ 查看未申辦旅平卡名單
+    </button>
+  </div>
+
+  <div id="loading">讀取中...</div>
+  <div id="resultsList"></div>
+</div>
+
+<!-- 稱呼輸入彈窗 -->
+<div id="nicknameOverlay" class="nickname-overlay">
+  <div class="nickname-box">
+    <div class="nickname-title" id="nicknameTitleText">請輸入稱呼</div>
+    <div class="nickname-sub" id="nicknameSubText">輸入後會自動儲存，下次不需再填</div>
+    <input type="text" id="nicknameInput" class="nickname-input" placeholder="例如：建明哥、麗敏姐、大哥…" maxlength="10">
+    <div class="nickname-btn-row">
+      <button class="nickname-btn-skip" onclick="nicknameSkip()">跳過，用姓名</button>
+      <button class="nickname-btn-send" onclick="nicknameConfirm()">確定傳送</button>
+    </div>
+  </div>
+</div>
+
+<!-- 產險 Modal -->
+<div id="detailModal" class="modal">
+  <div class="modal-content">
+    <div id="modalBody"></div>
+    <div id="travelStatusArea"></div>
+    <div id="familyReportArea"></div>
+    <div id="imagePreviewContainer" style="display:none; text-align:center; margin-top:15px;">
+      <div style="color:#d32f2f; font-weight:bold; font-size:14px; margin-bottom:10px;">📸 圖卡已生成！</div>
+      <img id="generatedImage" src="" />
+      <div style="display:flex; gap:10px; margin-bottom:10px;">
+        <button class="btn-action bg-img" onclick="downloadImage()">📥 下載圖卡</button>
+        <button class="btn-action bg-close" onclick="closeImagePreview()">返回明細</button>
+      </div>
+    </div>
+    <div class="btn-group" id="actionButtons">
+      <button class="btn-action bg-img"   onclick="generateImageCard()">🖼️ 產生精美圖卡</button>
+      <button class="btn-action bg-ai"    onclick="copyWarmPitch()">💬 智能話術</button>
+      <button class="btn-action bg-line"  onclick="shareToLine()">📄 純文字分享</button>
+      <button class="btn-action bg-close" onclick="closeModal()">關閉返回</button>
+      <button class="btn-action" style="background:#1565C0;color:white;" onclick="markVehicleStatus('已過戶')">🔄 標記已過戶</button>
+      <button class="btn-action" style="background:#4E342E;color:white;" onclick="markVehicleStatus('已報廢')">🗑️ 標記已報廢</button>
+    </div>
+  </div>
+</div>
+
+<!-- 旅平卡 Modal -->
+<div id="travelModal" class="modal">
+  <div class="modal-content">
+    <div id="travelModalBody"></div>
+    <div class="btn-group" id="travelActionButtons">
+      <button class="btn-action bg-img"    onclick="generateTravelImageCard()">🖼️ 製作旅平卡圖卡</button>
+      <button class="btn-action bg-travel" onclick="shareTravelCard()">💬 分享旅平卡資訊</button>
+      <button class="btn-action bg-close"  onclick="closeTravelModal()">關閉返回</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var currentPolicyData  = null;
+  var currentTravelData  = null;
+  var ADVISOR_NAME       = 'Pei-lin';
+  var ADVISOR_LINE       = '';
+  var currentTab         = 'insurance';
+
+  // ── 旅平卡日期顯示格式化 ──
+  // Apps Script 會把 Sheets 日期欄位自動轉成 Date 物件傳給前端
+  // 這個函式統一把各種輸入轉成 yyyy/MM/dd 或 yy/MM/dd（民國年）
+  function fmtDate(val) {
+    if (!val || val === '') return '—';
+    var s = String(val).trim();
+    // 已是乾淨格式：2011/09/01 或 57/03/12
+    if (/^\d{2,4}\/\d{2}\/\d{2}$/.test(s)) return s;
+    // 含時區字串（GMT / 台北標準時間）→ 解析後取日期部分
+    if (s.indexOf('GMT') !== -1 || s.indexOf(':') !== -1) {
+      try {
+        var d = new Date(s);
+        if (!isNaN(d.getTime())) {
+          // 用 UTC+8 取日期，避免時區偏移
+          var utc8 = new Date(d.getTime() + 8 * 60 * 60 * 1000);
+          var y  = utc8.getUTCFullYear();
+          var mo = ('0' + (utc8.getUTCMonth() + 1)).slice(-2);
+          var dy = ('0' + utc8.getUTCDate()).slice(-2);
+          return y + '/' + mo + '/' + dy;
+        }
+      } catch(e) {}
+    }
+    return s;
+  }
+
+  // ── 頁面載入時讀取系統設定 ──
+  google.script.run
+    .withSuccessHandler(function(cfg) {
+      if (cfg && cfg['顧問姓名']) ADVISOR_NAME = cfg['顧問姓名'];
+      if (cfg && cfg['顧問LINE'])  ADVISOR_LINE = cfg['顧問LINE'];
+    })
+    .getSystemConfig();
+
+  // ══════════════════════════════════════════════
+  // ★ 近期到期提醒（5天內）& 提前預警（45~51天）
+  // ══════════════════════════════════════════════
+  var expiringListCache = [];
+  var earlyWarningCache = [];
+
+  // 頁面載入完成後，一個請求同時取得兩個結果
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var hint = document.getElementById('expiryLoadingHint');
+      if (hint) hint.style.display = 'none';
+
+      var hasUrgent  = result && result.urgent  && result.urgent.length  > 0;
+      var hasWarning = result && result.warning && result.warning.length > 0;
+
+      if (!hasUrgent && !hasWarning) {
+        document.getElementById('expiryAlertArea').innerHTML =
+          '<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;' +
+          'padding:11px 16px;margin-bottom:8px;font-size:13px;color:#2E7D32;' +
+          'display:flex;align-items:center;gap:8px;">' +
+          '✅ 目前無即將到期保單（5天內及45~51天均無）</div>';
+        return;
+      }
+
+      renderExpiryAlert(result.urgent);
+      renderEarlyWarning(result.warning);
+    })
+    .withFailureHandler(function() {
+      var hint = document.getElementById('expiryLoadingHint');
+      if (hint) hint.style.display = 'none';
+    })
+    .getExpiringLists();
+
+  function renderExpiryAlert(list) {
+    var area = document.getElementById('expiryAlertArea');
+    if (!list || list.length === 0) { area.innerHTML = ''; return; }
+
+    expiringListCache = list;
+
+    // 只計算「待處理」的數量（未聯繫），「已聯繫」另外標記
+    var pendingCount = list.filter(function(i) { return !i.renewStatus; }).length;
+    var contactedCount = list.filter(function(i) { return i.renewStatus === '已聯繫'; }).length;
+
+    var badgeText = pendingCount > 0
+      ? pendingCount + ' 張待處理'
+      : contactedCount + ' 張等待回覆';
+
+    var html =
+      '<div class="expiry-alert-bar">' +
+        '<div class="expiry-alert-header" onclick="toggleExpiryAlert()">' +
+          '<span class="expiry-alert-title">⏰ 5 天內即將到期</span>' +
+          '<span style="display:flex;align-items:center;gap:8px;">' +
+            '<span class="expiry-alert-badge">' + list.length + ' 張</span>' +
+            '<span style="font-size:12px;color:#888;">' + badgeText + '　▼</span>' +
+          '</span>' +
+        '</div>' +
+        '<div class="expiry-alert-body" id="expiryAlertBody">' +
+          renderExpiryRows(list) +
+        '</div>' +
+      '</div>';
+    area.innerHTML = html;
+  }
+
+  function renderExpiryRows(list) {
+    var html = '';
+    list.forEach(function(item) {
+      var dayClass = 'days-' + Math.min(item.daysLeft, 5);
+      var dayText  = item.daysLeft === 0 ? '今天到期！' : '剩 ' + item.daysLeft + ' 天';
+      var isContacted = item.renewStatus === '已聯繫';
+      var encodedItem = encodeURIComponent(JSON.stringify({
+        name: item.name, type: item.type, policyNo: item.policyNo,
+        effectiveDate: item.effectiveDate, expiry: item.expiry,
+        plateNo: item.plateNo, premium: item.premium
+      }));
+
+      html +=
+        '<div class="expiry-row" id="expiry-row-' + item.policyNo + '">' +
+          '<div class="expiry-row-top">' +
+            '<span class="expiry-name">' + item.name + '</span>' +
+            '<span class="expiry-days-badge ' + dayClass + '">' + dayText + '</span>' +
+          '</div>' +
+          '<div class="expiry-info">' +
+            item.type +
+            (item.plateNo && item.plateNo !== '無' ? '　' + item.plateNo : '') +
+            '　到期：' + item.expiry +
+          '</div>' +
+          (isContacted ? '<div class="expiry-status-contacted">📞 已聯繫，等待回覆</div>' : '') +
+          '<div class="expiry-btn-row">' +
+            '<button class="expiry-btn" style="background:#00A3E0;color:white;" onclick="openDetailFromExpiry(\'' + item.policyNo + '\')">🔍 查看明細</button>' +'<button class="expiry-btn btn-send" onclick="expiryQuickShare(\'' + encodedItem + '\',\'' + item.policyNo + '\')">💬 傳提醒</button>' +
+             (!isContacted
+              ? '<button class="expiry-btn btn-contact" onclick="setRenewalStatus(\'' + item.policyNo + '\',\'已聯繫\')">📞 已聯繫</button>'
+              : '') +
+            '<button class="expiry-btn btn-done" onclick="setRenewalStatus(\'' + item.policyNo + '\',\'已續保\')">✅ 已續保</button>' +
+            '<button class="expiry-btn btn-skip" onclick="setRenewalStatus(\'' + item.policyNo + '\',\'不續保\')">✗ 不續保</button>' +
+            '<button class="expiry-btn btn-transfer" onclick="setRenewalStatus(\'' + item.policyNo + '\',\'已過戶\')">🔄 已過戶</button>' +
+            '<button class="expiry-btn btn-scrap" onclick="setRenewalStatus(\'' + item.policyNo + '\',\'已報廢\')">🗑️ 已報廢</button>' +
+          '</div>' +
+        '</div>';
+    });
+    return html;
+  }
+
+  function openDetailFromExpiry(policyNo) {
+    document.getElementById('loading').style.display = 'block';
+    google.script.run
+      .withSuccessHandler(renderModal)
+      .withFailureHandler(function() {
+        document.getElementById('loading').style.display = 'none';
+        alert('讀取保單詳情失敗，請稍後再試。');
+      })
+      .getPolicyDetails(policyNo);
+  }
+
+  function toggleExpiryAlert() {
+    var body = document.getElementById('expiryAlertBody');
+    if (body) body.classList.toggle('open');
+  }
+
+  // ══════════════════════════════════════════════
+  // ★ 稱呼管理
+  // ══════════════════════════════════════════════
+  var _nicknameCallback = null; // 稱呼確認後要執行的函式
+
+  /**
+   * 組訊息前先查詢稱呼
+   * insuredId: 被保人身分證號
+   * name: 被保人姓名（備用）
+   * callback(salutation): 稱呼確定後的回呼，salutation 就是「建明哥」或「李建明」
+   */
+  function withNickname(insuredId, name, callback) {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result && result.nickname) {
+          // 有稱呼 → 直接用
+          callback(result.nickname);
+        } else {
+          // 沒有稱呼 → 彈出輸入框
+          document.getElementById('nicknameTitleText').textContent = '請輸入 ' + name + ' 的稱呼';
+          document.getElementById('nicknameInput').value = '';
+          document.getElementById('nicknameOverlay').classList.add('show');
+          _nicknameCallback = function(salutation) {
+            // 如果有填稱呼，存回後端
+            if (salutation && salutation !== name) {
+              google.script.run.saveCustomerNickname(insuredId, salutation);
+            }
+            callback(salutation);
+          };
+          // 讓輸入框自動聚焦
+          setTimeout(function() { document.getElementById('nicknameInput').focus(); }, 100);
+        }
+      })
+      .withFailureHandler(function() { callback(name); }) // 失敗時直接用姓名
+      .getCustomerNickname(insuredId);
+  }
+
+  function nicknameConfirm() {
+    var val = document.getElementById('nicknameInput').value.trim();
+    document.getElementById('nicknameOverlay').classList.remove('show');
+    if (_nicknameCallback) {
+      _nicknameCallback(val || document.getElementById('nicknameTitleText').textContent.replace('請輸入 ', '').replace(' 的稱呼', ''));
+      _nicknameCallback = null;
+    }
+  }
+
+  function nicknameSkip() {
+    document.getElementById('nicknameOverlay').classList.remove('show');
+    if (_nicknameCallback) {
+      // 用姓名（從標題取回）
+      var name = document.getElementById('nicknameTitleText').textContent.replace('請輸入 ', '').replace(' 的稱呼', '');
+      _nicknameCallback(name);
+      _nicknameCallback = null;
+    }
+  }
+
+  // Enter 鍵也能確認
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && document.getElementById('nicknameOverlay').classList.contains('show')) {
+      nicknameConfirm();
+    }
+  });
+
+  function expiryQuickShare(encodedItem, policyNo) {
+    var item = JSON.parse(decodeURIComponent(encodedItem));
+    // 先標記已聯繫
+    google.script.run.updateRenewalStatus(policyNo, '已聯繫');
+    updateExpiryRowStatus(policyNo, '已聯繫');
+
+    // 查詢稱呼後組訊息
+    withNickname(item.maskedId || '', item.name, function(salutation) {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          var msg = buildPolicyMsg(salutation, item.type, item.plateNo,
+            item.effectiveDate, item.expiry, item.premium,
+            data ? data.details : []);
+          shareViaLine(msg);
+        })
+        .getPolicyDetails(policyNo);
+    });
+  }
+
+  function setRenewalStatus(policyNo, status) {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result && result.success) {
+          if (status === '已續保' || status === '不續保' || status === '已過戶' || status === '已報廢') {
+            removeExpiryRow(policyNo);
+          } else {
+            updateExpiryRowStatus(policyNo, status);
+          }
+        }
+      })
+      .updateRenewalStatus(policyNo, status);
+  }
+
+  function updateExpiryRowStatus(policyNo, status) {
+    // 重新渲染單筆（更新快取後重繪）
+    expiringListCache.forEach(function(item) {
+      if (item.policyNo === policyNo) item.renewStatus = status;
+    });
+    var body = document.getElementById('expiryAlertBody');
+    if (body) body.innerHTML = renderExpiryRows(expiringListCache);
+  }
+
+  function removeExpiryRow(policyNo) {
+    expiringListCache = expiringListCache.filter(function(i) { return i.policyNo !== policyNo; });
+    if (expiringListCache.length === 0) {
+      document.getElementById('expiryAlertArea').innerHTML = '';
+    } else {
+      renderExpiryAlert(expiringListCache);
+      var body = document.getElementById('expiryAlertBody');
+      if (body) body.classList.add('open');
+    }
+  }
+
+  // ══════════════════════════════════════════════
+  // ★ 45～51 天提前預警
+  // ══════════════════════════════════════════════
+  function renderEarlyWarning(list) {
+    var area = document.getElementById('earlyWarningArea');
+    if (!list || list.length === 0) { area.innerHTML = ''; return; }
+    earlyWarningCache = list;
+
+    var html =
+      '<div class="expiry-alert-bar" style="border-color:#C8E6C9;">' +
+        '<div class="expiry-alert-header" style="background:#F1F8E9;" onclick="toggleEarlyWarning()">' +
+          '<span class="expiry-alert-title" style="color:#388E3C;">📅 45～51 天即將到期</span>' +
+          '<span style="display:flex;align-items:center;gap:8px;">' +
+            '<span class="expiry-alert-badge" style="background:#388E3C;">' + list.length + ' 張</span>' +
+            '<span style="font-size:12px;color:#888;">提前預警　▼</span>' +
+          '</span>' +
+        '</div>' +
+        '<div class="expiry-alert-body" id="earlyWarningBody">' +
+          renderEarlyWarningRows(list) +
+        '</div>' +
+      '</div>';
+    area.innerHTML = html;
+  }
+
+  function renderEarlyWarningRows(list) {
+    var html = '';
+    list.forEach(function(item) {
+      var isContacted = item.renewStatus === '已聯繫';
+      var encodedItem = encodeURIComponent(JSON.stringify({
+        name: item.name, type: item.type, policyNo: item.policyNo,
+        effectiveDate: item.effectiveDate, expiry: item.expiry,
+        plateNo: item.plateNo, premium: item.premium,
+        maskedId: item.maskedId || '', daysLeft: item.daysLeft
+      }));
+
+      html +=
+        '<div class="expiry-row" id="early-row-' + item.policyNo + '" style="border-top-color:#F1F8E9;">' +
+          '<div class="expiry-row-top">' +
+            '<span class="expiry-name">' + item.name + '</span>' +
+            '<span class="expiry-days-badge" style="background:#E8F5E9;color:#2E7D32;">剩 ' + item.daysLeft + ' 天</span>' +
+          '</div>' +
+          '<div class="expiry-info">' +
+            item.type +
+            (item.plateNo && item.plateNo !== '無' ? '　' + item.plateNo : '') +
+            '　到期：' + item.expiry +
+          '</div>' +
+          (isContacted ? '<div class="expiry-status-contacted" style="background:#E8F5E9;color:#388E3C;">📞 已聯繫，等待回覆</div>' : '') +
+          '<div class="expiry-btn-row">' +
+            '<button class="expiry-btn" style="background:#00A3E0;color:white;" onclick="openDetailFromExpiry(\'' + item.policyNo + '\')">🔍 查看明細</button>' +
+            '<button class="expiry-btn btn-send" onclick="earlyWarnShare(\'' + encodedItem + '\',\'' + item.policyNo + '\')">💬 傳提醒</button>' +
+            (!isContacted
+              ? '<button class="expiry-btn btn-contact" onclick="setEarlyWarningStatus(\'' + item.policyNo + '\',\'已聯繫\')">📞 已聯繫</button>'
+              : '') +
+            '<button class="expiry-btn btn-done" onclick="setEarlyWarningStatus(\'' + item.policyNo + '\',\'已續保\')">✅ 已續保</button>' +
+            '<button class="expiry-btn btn-skip" onclick="setEarlyWarningStatus(\'' + item.policyNo + '\',\'不續保\')">✗ 不續保</button>' +
+            '<button class="expiry-btn btn-transfer" onclick="setEarlyWarningStatus(\'' + item.policyNo + '\',\'已過戶\')">🔄 已過戶</button>' +
+            '<button class="expiry-btn btn-scrap" onclick="setEarlyWarningStatus(\'' + item.policyNo + '\',\'已報廢\')">🗑️ 已報廢</button>' +
+          '</div>' +
+        '</div>';
+    });
+    return html;
+  }
+
+  function toggleEarlyWarning() {
+    var body = document.getElementById('earlyWarningBody');
+    if (body) body.classList.toggle('open');
+  }
+
+  function earlyWarnShare(encodedItem, policyNo) {
+    var item = JSON.parse(decodeURIComponent(encodedItem));
+    // 標記已聯繫
+    google.script.run.updateRenewalStatus(policyNo, '已聯繫');
+    updateEarlyWarningStatus(policyNo, '已聯繫');
+
+    withNickname(item.maskedId || '', item.name, function(salutation) {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          var msg = "🌟【保單續保提前通知】🌟\n\n";
+          msg += salutation + " 您好！\n\n";
+          msg += "📋 您的以下保單將於 " + item.daysLeft + " 天後到期，請檢視原保單內容，後續我再傳送今年續保內容：\n";
+          msg += "────────────────────\n";
+          msg += "📄 險種：" + item.type + "\n";
+          if (item.plateNo && item.plateNo !== '無') msg += "🚗 車號：" + item.plateNo + "\n";
+          if (item.effectiveDate && item.effectiveDate !== '無') msg += "📅 生效日：" + item.effectiveDate + "\n";
+          msg += "⏰ 到期日：" + item.expiry + "\n";
+          if (item.premium && item.premium !== '無') msg += "💰 總保費：NT$ " + item.premium + " 元\n";
+          if (data && data.details && data.details.length > 0) {
+            msg += "\n📌 保障明細：\n";
+            data.details.forEach(function(d) {
+              msg += "  • " + d.name;
+              if (d.amount && d.amount !== '無') msg += "　保額 " + d.amount;
+              if (d.premium && d.premium !== '無' && d.premium !== '0') msg += "　保費 " + d.premium + " 元";
+              msg += "\n";
+            });
+          }
+          msg += "────────────────────\n\n";
+          msg += "若有任何問題，請隨時回覆聯繫 " + ADVISOR_NAME + "！🙌";
+          if (ADVISOR_LINE) msg += "\n📲 加入 LINE：https://line.me/ti/p/" + ADVISOR_LINE;
+          shareViaLine(msg);
+        })
+        .getPolicyDetails(policyNo);
+    });
+  }
+
+  function setEarlyWarningStatus(policyNo, status) {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result && result.success) {
+          if (status === '已續保' || status === '不續保' || status === '已過戶' || status === '已報廢') {
+            removeEarlyWarningRow(policyNo);
+          } else {
+            updateEarlyWarningStatus(policyNo, status);
+          }
+        }
+      })
+      .updateRenewalStatus(policyNo, status);
+  }
+
+  function updateEarlyWarningStatus(policyNo, status) {
+    earlyWarningCache.forEach(function(item) {
+      if (item.policyNo === policyNo) item.renewStatus = status;
+    });
+    var body = document.getElementById('earlyWarningBody');
+    if (body) body.innerHTML = renderEarlyWarningRows(earlyWarningCache);
+  }
+
+  function removeEarlyWarningRow(policyNo) {
+    earlyWarningCache = earlyWarningCache.filter(function(i) { return i.policyNo !== policyNo; });
+    if (earlyWarningCache.length === 0) {
+      document.getElementById('earlyWarningArea').innerHTML = '';
+    } else {
+      renderEarlyWarning(earlyWarningCache);
+      var body = document.getElementById('earlyWarningBody');
+      if (body) body.classList.add('open');
+    }
+  }
+
+  // ── Tab 切換 ──
+  function switchTab(tab) {
+    currentTab = tab;
+    document.getElementById('resultsList').innerHTML = '';
+    document.getElementById('tabInsurance').className = 'tab-btn' + (tab === 'insurance' ? ' active-insurance' : '');
+    document.getElementById('tabTravel').className    = 'tab-btn' + (tab === 'travel'    ? ' active-travel'    : '');
+    document.getElementById('insuranceSearch').style.display = tab === 'insurance' ? 'block' : 'none';
+    document.getElementById('travelSearch').style.display    = tab === 'travel'    ? 'block' : 'none';
+  }
+
+  // ── 產險搜尋 ──
+  function handleEnterInsurance(e) { if (e.key === 'Enter') handleSearch(); }
+  function handleSearch() {
+    var val = document.getElementById('smartSearch').value.trim();
+    if (!val) return alert('請輸入搜尋條件');
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('resultsList').innerHTML = '';
+    google.script.run.withSuccessHandler(showResults).searchPolicies(val);
+  }
+
+  function showResults(data) {
+    document.getElementById('loading').style.display = 'none';
+    var list = document.getElementById('resultsList');
+    if (!data || data.length === 0) { list.innerHTML = '<p style="text-align:center;color:#888;">查無資料。</p>'; return; }
+    var html = '';
+    data.forEach(function(item) {
+      var agentTag = item.agentCode && item.agentCode !== "無" ? " <span style='color:#FF9800;'>[" + item.agentCode + "]</span>" : "";
+      html += "<div class='card' onclick='openDetail(\"" + item.policyNo + "\")'>" +
+        "<div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;'>" +
+          "<div class='card-title' style='margin-bottom:0;padding-right:10px;'>" + item.name + " (" + item.type + ")" + agentTag + "</div>" +
+          "<div style='display:flex;gap:6px;align-items:center;white-space:nowrap;'>" +
+            "<button onclick='event.stopPropagation();window.print()' style='background:#607D8B;color:white;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;'>🖨️ 列印</button>" +
+            "<div class='status-badge'>" + item.status + "</div>" +
+          "</div>" +
+        "</div>" +
+        "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px;'>" +
+          "<div><div style='color:#00A3E0;font-size:13px;font-weight:bold;margin-bottom:6px;'>👤 被保人資訊</div>" +
+            "<div class='card-info'>🆔 " + item.maskedId + " | 🎂 " + item.birthday + "</div>" +
+            "<div class='card-info'>🚗 車牌: " + item.plateNo + "</div>" +
+            "<div class='card-info'>📅 到期日: " + item.expiry + "</div></div>" +
+          "<div><div style='color:#00A3E0;font-size:13px;font-weight:bold;margin-bottom:6px;'>📞 要保人資訊</div>" +
+            "<div class='card-info'>姓名: " + item.applicantName + "</div>" +
+            "<div class='card-info'>電話: " + item.applicantPhone + "</div>" +
+            "<div class='card-info' style='white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' title='" + item.address + "'>🏠 地址: " + item.address + "</div></div>" +
+        "</div>" +
+        "<div style='padding-top:12px;border-top:1px dashed #eee;'>" +
+          "<button onclick='event.stopPropagation();quickShare(\"" + item.name + "\",\"" + item.type + "\",\"" + item.policyNo + "\",\"" + item.effectiveDate + "\",\"" + item.expiry + "\",\"" + item.plateNo + "\",\"" + item.premium + "\",\"" + item.maskedId + "\")' style='width:100%;background:#00B900;color:white;border:none;padding:10px;border-radius:6px;font-weight:bold;font-size:15px;cursor:pointer;'>💬 傳送到期提醒</button>" +
+        "</div></div>";
+    });
+    list.innerHTML = html;
+  }
+
+  // ── 未申辦旅平卡名單 ──
+  var uncoveredAllList = []; // 儲存完整名單供搜尋用
+
+  function loadUncoveredList() {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('resultsList').innerHTML = '';
+    google.script.run
+      .withSuccessHandler(showUncoveredList)
+      .withFailureHandler(function(e) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('resultsList').innerHTML = '<p style="text-align:center;color:#d32f2f;">讀取失敗，請先執行「比對旅平卡覆蓋率」</p>';
+      })
+      .getUncoveredList();
+  }
+
+  function showUncoveredList(result) {
+    document.getElementById('loading').style.display = 'none';
+    var list = document.getElementById('resultsList');
+
+    if (result.error) {
+      list.innerHTML = '<div style="text-align:center;color:#E65100;padding:20px;background:#FBE9E7;border-radius:10px;">' +
+        '⚠️ ' + result.error + '<br><br>' +
+        '<small>請到 Sheets 選單執行「🔍 比對旅平卡覆蓋率」後再試</small></div>';
+      return;
+    }
+    if (!result.list || result.list.length === 0) {
+      list.innerHTML = '<p style="text-align:center;color:#2E7D32;font-weight:bold;">🎉 所有客戶都已申辦旅平卡！</p>';
+      return;
+    }
+
+    uncoveredAllList = result.list;
+
+    var html =
+      '<div class="uncovered-header">' +
+        '<div style="color:#E65100;font-weight:bold;">❌ 未申辦旅平卡：共 ' + result.total + ' 人</div>' +
+        '<div style="font-size:12px;color:#888;">點擊推薦按鈕傳送訊息</div>' +
+      '</div>' +
+      '<input class="uncovered-search" type="text" placeholder="輸入姓名快速篩選..." ' +
+        'oninput="filterUncovered(this.value)" />' +
+      '<div id="uncoveredListBody"></div>';
+
+    list.innerHTML = html;
+    renderUncoveredCards(uncoveredAllList);
+  }
+
+  function filterUncovered(keyword) {
+    if (!keyword.trim()) {
+      renderUncoveredCards(uncoveredAllList);
+      return;
+    }
+    var filtered = uncoveredAllList.filter(function(item) {
+      return item.name.includes(keyword) || item.applicant.includes(keyword) ||
+             item.insType.includes(keyword);
+    });
+    renderUncoveredCards(filtered);
+  }
+
+  function renderUncoveredCards(list) {
+    var html = '';
+    if (list.length === 0) {
+      html = '<p style="text-align:center;color:#888;">無符合資料</p>';
+    } else {
+      list.forEach(function(item) {
+        // 把資料 encode 傳給推薦函式
+        var encoded = encodeURIComponent(JSON.stringify({ name: item.name, applicant: item.applicant }));
+        html +=
+          '<div class="uncovered-card">' +
+            '<div class="uncovered-info">' +
+              '<div class="uncovered-name">' + item.name + '</div>' +
+              '<div class="uncovered-detail">' +
+                item.insType + '　到期：' + item.expiry +
+                (item.applicant && item.applicant !== item.name ? '　要保人：' + item.applicant : '') +
+              '</div>' +
+            '</div>' +
+            '<button class="uncovered-recommend-btn" onclick="recommendTravel(\'' + encoded + '\')">💬 推薦旅平卡</button>' +
+          '</div>';
+      });
+    }
+    document.getElementById('uncoveredListBody').innerHTML = html;
+  }
+
+  function recommendTravel(encodedData) {
+    var data = JSON.parse(decodeURIComponent(encodedData));
+    // 要保人和被保人不同時，用要保人（通常是付費的那位）
+    var targetName = (data.applicant && data.applicant !== data.name) ? data.applicant : data.name;
+    var msg =
+      "🏖️【旅平卡推薦】\n\n" +
+      targetName + " 您好！我們注意到您目前尚未申辦旅平卡保障。\n\n" +
+      "富邦人壽及產險均有提供旅平卡，保障內容包含：\n" +
+      "✅ 意外身故／失能保障\n" +
+      "✅ 海內外旅遊醫療費用\n" +
+      "✅ 海外突發疾病\n" +
+      "✅ 產險更有不便險\n\n" +
+      "有興趣了解詳情，歡迎隨時聯繫 " + ADVISOR_NAME + "！🙌";
+    if (ADVISOR_LINE) msg += "\n📲 加入 LINE：https://line.me/ti/p/" + ADVISOR_LINE;
+    shareViaLine(msg);
+  }
+
+  // ── 旅平卡搜尋 ──
+  function handleEnterTravel(e) { if (e.key === 'Enter') handleTravelSearch(); }
+  function handleTravelSearch() {
+    var val = document.getElementById('travelSearchInput').value.trim();
+    if (!val) return alert('請輸入搜尋條件');
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('resultsList').innerHTML = '';
+    google.script.run.withSuccessHandler(showTravelResults).searchTravelCards(val);
+  }
+
+  function showTravelResults(data) {
+    document.getElementById('loading').style.display = 'none';
+    var list = document.getElementById('resultsList');
+    if (!data || data.length === 0) { list.innerHTML = '<p style="text-align:center;color:#888;">查無資料。</p>'; return; }
+    var html = '';
+    data.forEach(function(item) {
+      var agentTag = item.agentCode ? " <span style='color:#FF9800;font-weight:bold;'>[" + item.agentCode + "]</span>" : "";
+
+      // ✅ matchHint 必須在 forEach 內，item 才存在
+      var matchHint = (item.matchedMembers && item.matchedMembers.length > 0)
+        ? "<div style='color:#FF7043;font-size:12px;margin-top:6px;padding:4px 8px;background:#FBE9E7;border-radius:4px;'>🔍 附加被保人：" +
+          item.matchedMembers.map(function(m){ return m.name + '（' + m.relation + '）'; }).join('、') +
+          "</div>"
+        : "";
+
+      html += "<div class='travel-card' onclick='openTravelDetail(\"" + item.certNo + "\")'>" +
+        "<div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;'>" +
+          "<div class='travel-card-title'>" + item.appName + agentTag + "</div>" +
+          "<div>" +
+            "<span class='travel-badge'>" + item.cardType + "</span>" +
+            "<span class='member-count-badge'>👥 " + item.memberCount + " 人</span>" +
+          "</div>" +
+        "</div>" +
+        "<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;color:#555;'>" +
+          "<div>🆔 " + item.appId + "</div>" +
+          "<div>📱 " + (item.phone1 || '—') + "</div>" +
+          "<div>📅 生效：" + fmtDate(item.effDate) + "</div>" +
+          "<div>📋 憑證：" + item.certNo + "</div>" +
+        "</div>" +
+        "<div style='margin-top:8px;font-size:12px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>🏠 " + item.address + "</div>" +
+        matchHint +
+      "</div>";
+    });
+    list.innerHTML = html;
+  }
+
+  // ── 產險 Modal ──
+  function openDetail(no) {
+    document.getElementById('loading').style.display = 'block';
+    google.script.run.withSuccessHandler(renderModal).getPolicyDetails(no);
+  }
+
+  function renderModal(data) {
+    document.getElementById('loading').style.display = 'none';
+    if (!data) return;
+    currentPolicyData = data;
+    document.getElementById('familyReportArea').innerHTML = '';
+    document.getElementById('travelStatusArea').innerHTML = '';
+    var main     = data.main;
+    var agentTag = main.agentCode && main.agentCode !== "無" ? " <span style='color:#FF9800;'>[" + main.agentCode + "]</span>" : "";
+
+    var html = '<div class="detail-section">' +
+      '<div class="detail-title" style="font-size:20px;color:#00A3E0;">' + main.insuredName + ' 的專屬保障摘要' + agentTag + '</div>' +
+      '<div class="info-grid">' +
+        '<div><div class="info-label">保單號碼</div><b>' + main.policyNo + '</b></div>' +
+        '<div><div class="info-label">險種</div><b>' + main.type + '</b></div>' +
+        '<div><div class="info-label">生效日期</div>' + main.effectiveDate + '</div>' +
+        '<div><div class="info-label">到期日期</div><b style="color:#d32f2f;">' + main.expiryDate + '</b></div>' +
+        '<div><div class="info-label">總保費</div><b style="color:#00B900;">NT$ ' + (main.premium || 0) + '</b></div>' +
+        '<div><div class="info-label">車牌</div>' + main.plateNo + '</div>' +
+      '</div></div>';
+    html += '<div class="detail-section"><div class="detail-title">🛡️ 核心保障明細</div>' +
+      '<table><tr><th>保障項目</th><th>保額</th><th style="text-align:right;">保費</th></tr>';
+    if (data.details && data.details.length > 0) {
+      data.details.forEach(function(i) { html += '<tr><td>' + i.name + '</td><td>' + i.amount + '</td><td style="text-align:right;">' + i.premium + '</td></tr>'; });
+    } else { html += '<tr><td colspan="3" style="text-align:center;color:#888;">無明細資料</td></tr>'; }
+    html += '</table></div>';
+    html += '<div style="text-align:center;margin-top:20px;font-size:12px;color:#888;">由專屬顧問 ' + ADVISOR_NAME + ' 為您整理</div>';
+
+    document.getElementById('modalBody').innerHTML = html;
+    document.getElementById('modalBody').style.display = 'block';
+    document.getElementById('imagePreviewContainer').style.display = 'none';
+    document.getElementById('actionButtons').style.display = 'flex';
+
+    // ── 旅平卡狀態：先清空，再呼叫後端查詢 ──
+    document.getElementById('travelStatusArea').innerHTML =
+      '<div style="margin-top:16px;border-top:2px dashed #FFE0B2;padding-top:14px;">' +
+        '<div style="font-size:13px;color:#FF9800;font-weight:bold;">🏖️ 旅平卡狀態</div>' +
+        '<div style="font-size:12px;color:#aaa;margin-top:4px;">查詢中...</div>' +
+      '</div>';
+    google.script.run
+      .withSuccessHandler(renderTravelStatus)
+      .checkTravelCoverage(main.maskedId);
+
+    if (main.familyId && main.familyId !== "無") {
+      document.getElementById('familyReportArea').innerHTML =
+        '<div style="margin-top:20px;border-top:3px double #eee;padding-top:16px;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+            '<div><span style="font-weight:bold;color:#333;">👨‍👩‍👧‍👦 家庭保障</span>' +
+            '<span style="font-size:12px;color:#888;margin-left:8px;">(' + main.familyId + ')</span></div>' +
+            '<button onclick="loadFamilyReport(\'' + main.familyId + '\')" ' +
+              'style="background:#00A3E0;color:white;border:none;padding:8px 16px;border-radius:6px;font-weight:bold;cursor:pointer;font-size:13px;">' +
+              '展開家庭總覽 ↓</button>' +
+          '</div>' +
+        '</div>';
+    }
+    document.getElementById('detailModal').style.display = 'flex';
+  }
+
+  // ── 旅平卡狀態顯示 ──
+  function renderTravelStatus(info) {
+    var area = document.getElementById('travelStatusArea');
+    if (!area) return;
+
+    var html = '<div style="margin-top:16px;border-top:2px dashed #FFE0B2;padding-top:14px;">' +
+      '<div style="font-size:13px;color:#FF9800;font-weight:bold;margin-bottom:8px;">🏖️ 旅平卡狀態</div>';
+
+    if (info && info.hasTravelCard) {
+      // ✅ 有旅平卡
+      html +=
+        '<div style="background:#E8F5E9;border-radius:8px;padding:10px 14px;border-left:4px solid #43A047;">' +
+          '<div style="color:#2E7D32;font-weight:bold;font-size:14px;">✅ 已持有旅平卡</div>' +
+          '<div style="font-size:13px;color:#333;margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:6px;">' +
+            '<div><span style="color:#888;font-size:11px;">卡片類別</span><br>' + info.cardType + '</div>' +
+            '<div><span style="color:#888;font-size:11px;">身份</span><br>' + info.role + '</div>' +
+            '<div><span style="color:#888;font-size:11px;">要保人</span><br>' + info.appName + '</div>' +
+            '<div><span style="color:#888;font-size:11px;">憑證號碼</span><br><span style="font-size:11px;">' + info.certNo + '</span></div>' +
+          '</div>' +
+        '</div>';
+    } else {
+      // ❌ 無旅平卡
+      html +=
+        '<div style="background:#FFF8E1;border-radius:8px;padding:10px 14px;border-left:4px solid #FFB300;">' +
+          '<div style="color:#E65100;font-weight:bold;font-size:14px;">❌ 尚無旅平卡保障</div>' +
+          '<div style="font-size:12px;color:#666;margin-top:6px;">可向客戶介紹旅平卡，提供意外及旅遊保障 🌏</div>' +
+        '</div>';
+    }
+
+    html += '</div>';
+    area.innerHTML = html;
+  }
+
+  function loadFamilyReport(familyId) {
+    document.getElementById('familyReportArea').querySelector('button').textContent = '載入中...';
+    google.script.run.withSuccessHandler(renderFamilyReport).getFamilyReport(familyId);
+  }
+
+  // ── 旅平卡 Modal ──
+  function openTravelDetail(certNo) {
+    document.getElementById('loading').style.display = 'block';
+    google.script.run.withSuccessHandler(renderTravelModal).getTravelCardDetails(certNo);
+  }
+
+  function renderTravelModal(data) {
+    document.getElementById('loading').style.display = 'none';
+    if (!data) return;
+    currentTravelData = data;
+    var m         = data.main;
+    var agentTag  = m.agentCode ? ' <span style="color:#FF9800;font-size:16px;">[' + m.agentCode + ']</span>' : '';
+
+    var html =
+      '<div class="detail-section">' +
+        '<div class="detail-title detail-title-travel" style="font-size:19px;color:' + 'var(--travel-color)' + ';">' +
+          '🏖️ ' + m.appName + ' 的旅平卡明細' + agentTag +
+        '</div>' +
+        '<div class="info-grid">' +
+          '<div><div class="info-label">憑證號碼</div><b>' + m.certNo + '</b></div>' +
+          '<div><div class="info-label">卡片類別</div><b>' + m.cardType + '</b></div>' +
+          '<div><div class="info-label">要保人身分證</div>' + m.appId + '</div>' +
+          '<div><div class="info-label">生效起始日</div><b>' + fmtDate(m.effDate) + '</b></div>' +
+          '<div><div class="info-label">行動電話</div>' + (m.mobile || '—') + '</div>' +
+          '<div><div class="info-label">聯絡電話</div>' + (m.phone || '—') + '</div>' +
+          '<div><div class="info-label">出生日期</div>' + fmtDate(m.birthday) + '</div>' +
+          '<div><div class="info-label">Email</div>' + (m.email || '—') + '</div>' +
+        '</div>' +
+        '<div class="info-label" style="margin-top:8px;">🏠 通訊地址</div>' +
+        '<div style="font-size:13px;color:#333;margin-top:4px;">' + (m.address || '—') + '</div>' +
+      '</div>';
+
+    // 被保人名冊表格
+    html += '<div class="detail-section">' +
+      '<div class="detail-title detail-title-travel">👥 被保人名冊（共 ' + data.members.length + ' 人）</div>' +
+      '<table class="travel-member-table">' +
+      '<tr><th>姓名</th><th>關係</th><th>出生日期</th><th>身分證</th><th>受益人</th></tr>';
+
+    data.members.forEach(function(mb) {
+      html += '<tr>' +
+        '<td><b>' + mb.name + '</b></td>' +
+        '<td><span class="relation-badge">' + mb.relation + '</span></td>' +
+        '<td>' + fmtDate(mb.birthday) + '</td>' +
+        '<td style="font-size:11px;">' + mb.idNo + '</td>' +
+        '<td style="font-size:11px;">' + mb.beneNamee + '</td>' +
+      '</tr>';
+    });
+    html += '</table></div>';
+    html += '<div style="text-align:center;margin-top:16px;font-size:12px;color:#888;">由專屬顧問 ' + ADVISOR_NAME + ' 為您整理</div>';
+
+    document.getElementById('travelModalBody').innerHTML = html;
+    document.getElementById('travelActionButtons').style.display = 'flex';
+    document.getElementById('travelModal').style.display = 'flex';
+  }
+
+  // ── 旅平卡分享 ──
+  // ══════════════════════════════════════════════
+  // ★ LINE 分享通用函式（雙軌模式）
+  //
+  //  手機：直接開啟 LINE App 分享純文字
+  //  電腦：自動複製訊息到剪貼簿 + 提示說明
+  //        （LINE 網頁版無法直接分享純文字，需手動開 LINE 貼上）
+  // ══════════════════════════════════════════════
+  function shareViaLine(msg) {
+    var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      // 手機：直接開啟 LINE App
+      window.open("https://line.me/R/share?text=" + encodeURIComponent(msg), '_blank');
+    } else {
+      // 電腦：複製到剪貼簿，提示使用者自行開啟 LINE 貼上
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(msg).then(function() {
+          alert(
+            '📋 訊息已複製到剪貼簿！\n\n' +
+            '請開啟 LINE，選擇聯絡人後按 Ctrl+V 貼上訊息，再點傳送。'
+          );
+        }).catch(function() {
+          // 剪貼簿 API 失敗（HTTP 或權限問題）→ 改用舊方法
+          window.open("https://line.me/R/share?text=" + encodeURIComponent(msg), '_blank');
+        });
+      } else {
+        // 不支援剪貼簿 API → 用舊方法
+        window.open("https://line.me/R/share?text=" + encodeURIComponent(msg), '_blank');
+      }
+    }
+  }
+
+  function shareTravelCard() {
+    if (!currentTravelData) return;
+    var m   = currentTravelData.main;
+    var msg = "🏖️【旅平卡資訊】\n\n";
+    msg += "👤 要保人：" + m.appName + "\n";
+    msg += "📋 憑證號碼：" + m.certNo + "\n";
+    msg += "🗓️ 生效日：" + m.effDate + "\n";
+    msg += "📱 電話：" + (m.mobile || m.phone || '—') + "\n\n";
+    msg += "👥 被保人名冊（" + currentTravelData.members.length + " 人）：\n";
+    currentTravelData.members.forEach(function(mb) {
+      msg += "  • " + mb.name + "（" + mb.relation + "）\n";
+    });
+    msg += "\n如需查詢或更新資料，請聯繫 " + ADVISOR_NAME + "！";
+    if (ADVISOR_LINE) msg += "\n📲 加入 LINE：https://line.me/ti/p/" + ADVISOR_LINE;
+    shareViaLine(msg);
+  }
+
+  function generateTravelImageCard() {
+    var target = document.getElementById('travelModalBody');
+    if (!target) return;
+    document.getElementById('loading').style.display = 'block';
+    html2canvas(target, { scale: 2, backgroundColor: "#ffffff", useCORS: true }).then(function(canvas) {
+      document.getElementById('loading').style.display = 'none';
+      var imgSrc  = canvas.toDataURL("image/jpeg", 0.92);
+      var overlay = document.getElementById('travelImageOverlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'travelImageOverlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:3000;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;';
+        document.body.appendChild(overlay);
+      }
+      overlay._imgSrc = imgSrc;
+      overlay.innerHTML =
+        '<div style="background:white;width:100%;max-width:600px;border-radius:20px 20px 0 0;padding:20px;max-height:85vh;overflow-y:auto;box-sizing:border-box;">' +
+          '<div style="color:var(--travel-color);font-weight:bold;font-size:14px;margin-bottom:10px;text-align:center;">📸 旅平卡圖卡已生成！</div>' +
+          '<img id="travelCardImg" style="width:100%;border-radius:10px;margin-bottom:15px;" />' +
+          '<div style="display:flex;gap:10px;">' +
+            '<button onclick="downloadTravelImage()" style="flex:1;padding:12px;background:#FF7043;color:white;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">📥 下載圖卡</button>' +
+            '<button onclick="document.getElementById(\'travelImageOverlay\').style.display=\'none\'" style="flex:1;padding:12px;background:#f1f1f1;color:#333;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">關閉返回</button>' +
+          '</div>' +
+        '</div>';
+      document.getElementById('travelCardImg').src = imgSrc;
+      overlay.style.display = 'flex';
+    });
+  }
+
+  function downloadTravelImage() {
+    var overlay = document.getElementById('travelImageOverlay');
+    if (!overlay || !overlay._imgSrc) return;
+    var a = document.createElement('a');
+    a.href = overlay._imgSrc;
+    a.download = (currentTravelData ? currentTravelData.main.appName : '旅平卡') + '_旅平卡明細.jpg';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+
+  function closeTravelModal() { document.getElementById('travelModal').style.display = 'none'; currentTravelData = null; }
+
+  // ── 家庭總覽 ──
+  function renderFamilyReport(familyData) {
+    if (!familyData || !familyData.memberGroups) return;
+    var area    = document.getElementById('familyReportArea');
+    var s       = familyData.summary;
+    var advisor = familyData.advisorName || ADVISOR_NAME;
+
+    var summaryHtml = '<div class="family-summary-bar">';
+    if (s.urgent  > 0) summaryHtml += '<span class="summary-chip chip-urgent">🔴 緊急 ' + s.urgent + ' 張</span>';
+    if (s.warning > 0) summaryHtml += '<span class="summary-chip chip-warning">🟠 待跟進 ' + s.warning + ' 張</span>';
+    if (s.ok      > 0) summaryHtml += '<span class="summary-chip chip-ok">✅ 正常 ' + s.ok + ' 張</span>';
+    if (s.expired > 0) summaryHtml += '<span class="summary-chip chip-expired">⚫ 退保/過期 ' + s.expired + ' 張</span>';
+    summaryHtml += '</div>';
+
+    var membersHtml = '';
+    familyData.memberGroups.forEach(function(member) {
+      var memberShareData = buildMemberShareText(member, advisor);
+      membersHtml += '<div class="member-card">' +
+        '<div class="member-header">' +
+          '<div style="display:flex;align-items:center;gap:8px;">' +
+            '<span class="member-name">' + member.name + '</span>' +
+            '<span class="member-relation">' + (member.relation || '未設定') + '</span>' +
+          '</div>' +
+          '<button class="member-share-btn" onclick="shareOnePerson(\'' + encodeURIComponent(JSON.stringify(memberShareData)) + '\')">💬 傳提醒</button>' +
+        '</div>';
+      member.policies.forEach(function(p) {
+        var daysText = p.daysLeft === null ? '—' : p.urgency === 'expired' ? '已退保' : p.daysLeft < 0 ? '已過期' : p.daysLeft + ' 天';
+        membersHtml += '<div class="policy-row">' +
+          '<div class="urgency-dot dot-' + p.urgency + '"></div>' +
+          '<div class="policy-type">' + p.type + '</div>' +
+          '<div class="policy-plate">' + (p.plate !== '無' ? p.plate : '') + '</div>' +
+          '<div class="policy-expiry expiry-' + p.urgency + '">' + p.expiry + '</div>' +
+          '<div class="days-badge days-' + p.urgency + '">' + daysText + '</div>' +
+        '</div>';
+      });
+      membersHtml += '</div>';
+    });
+
+    var peilinHtml        = '<div class="peilin-note">' + familyData.analysis.replace(/\n/g, '<br>') + '</div>';
+    var encodedFamilyData = encodeURIComponent(JSON.stringify({ memberGroups: familyData.memberGroups, id: familyData.id, advisor: advisor }));
+    var familyShareBtn    =
+      '<div style="display:flex;gap:10px;margin-top:8px;">' +
+        '<button class="family-share-btn" style="flex:1;font-size:13px;" onclick="shareFamilyAll(\'' + encodedFamilyData + '\')">💬 傳送整個家庭到期提醒</button>' +
+        '<button class="family-share-btn" style="flex:1;font-size:13px;background:#00A3E0;" onclick="generateFamilyImageCard()">📸 製作家庭圖卡</button>' +
+      '</div>';
+
+    area.innerHTML =
+      '<div class="family-header">' +
+        '<div id="familyCardContent">' +
+          '<div class="detail-title">👨‍👩‍👧‍👦 家庭保障總覽 <span style="font-size:13px;color:#888;font-weight:normal;">(' + familyData.id + ')</span></div>' +
+          summaryHtml + membersHtml + peilinHtml +
+        '</div>' +
+        familyShareBtn +
+      '</div>';
+  }
+
+  // ── 分享功能 ──
+  // ── 共用：組保單提醒訊息 ──
+  function buildPolicyMsg(salutation, type, plateNo, effectiveDate, expiry, premium, details) {
+    var msg = "✨【保單到期提醒】✨\n\n";
+    msg += salutation + " 您好！\n\n";
+    msg += "📋 以下保單即將到期，請檢視原保單內容：\n";
+    msg += "────────────────────\n";
+    msg += "📄 險種：" + type + "\n";
+    if (plateNo && plateNo !== '無') msg += "🚗 車號：" + plateNo + "\n";
+    if (effectiveDate && effectiveDate !== '無') msg += "📅 生效日：" + effectiveDate + "\n";
+    msg += "⏰ 到期日：" + expiry + "\n";
+    if (premium && premium !== '無') msg += "💰 總保費：NT$ " + premium + " 元\n";
+    if (details && details.length > 0) {
+      msg += "\n📌 保障明細：\n";
+      details.forEach(function(d) {
+        msg += "  • " + d.name;
+        if (d.amount && d.amount !== '無') msg += "　保額 " + d.amount;
+        if (d.premium && d.premium !== '無' && d.premium !== '0') msg += "　保費 " + d.premium + " 元";
+        msg += "\n";
+      });
+    }
+    msg += "────────────────────\n\n";
+    msg += "若需續約或有任何問題，請隨時回覆聯繫 " + ADVISOR_NAME + "！🙌";
+    if (ADVISOR_LINE) msg += "\n📲 加入 LINE：https://line.me/ti/p/" + ADVISOR_LINE;
+    return msg;
+  }
+
+  function quickShare(name, type, policyNo, effectiveDate, expiry, plateNo, premium, maskedId) {
+    withNickname(maskedId || '', name, function(salutation) {
+      document.getElementById('loading').style.display = 'block';
+      google.script.run
+        .withSuccessHandler(function(data) {
+          document.getElementById('loading').style.display = 'none';
+          shareViaLine(buildPolicyMsg(salutation, type, plateNo, effectiveDate, expiry, premium, data ? data.details : []));
+        })
+        .withFailureHandler(function() {
+          document.getElementById('loading').style.display = 'none';
+          shareViaLine(buildPolicyMsg(salutation, type, plateNo, effectiveDate, expiry, premium, []));
+        })
+        .getPolicyDetails(policyNo);
+    });
+  }
+
+  function shareOnePerson(encodedData) {
+    var member         = JSON.parse(decodeURIComponent(encodedData));
+    var advisor        = member.advisor || ADVISOR_NAME;
+    var urgentPolicies = member.policies.filter(function(p) { return p.urgency === 'urgent' || p.urgency === 'warning'; });
+    if (urgentPolicies.length === 0) { alert('此成員目前沒有即將到期的保單。'); return; }
+    withNickname(member.maskedId || '', member.name, function(salutation) {
+      var msg = "✨【保單到期提醒】✨\n\n";
+      msg += salutation + " 您好，\n以下保單即將到期，請確認續約：\n\n";
+      urgentPolicies.forEach(function(p) {
+        msg += "【" + p.type + "】" + (p.plate !== '無' ? " " + p.plate : "") + "\n到期日：" + p.expiry + "（剩 " + p.daysLeft + " 天）\n\n";
+      });
+      msg += "如需續約或有任何問題，歡迎隨時聯繫 " + advisor + "！🙌" +
+        (ADVISOR_LINE ? "\n📲 加入 LINE：https://line.me/ti/p/" + ADVISOR_LINE : "");
+      shareViaLine(msg);
+    });
+  }
+
+  function shareFamilyAll(encodedData) {
+    var d             = JSON.parse(decodeURIComponent(encodedData));
+    var advisor       = d.advisor || ADVISOR_NAME;
+    var urgentMembers = [];
+    d.memberGroups.forEach(function(member) {
+      var urgent = member.policies.filter(function(p) { return p.urgency === 'urgent' || p.urgency === 'warning'; });
+      if (urgent.length > 0) urgentMembers.push({
+        name: member.name, maskedId: member.maskedId || '',
+        relation: member.relation, policies: urgent
+      });
+    });
+    if (urgentMembers.length === 0) { alert('此家庭目前沒有即將到期的保單。'); return; }
+    // 以「本人」為稱呼對象，找不到本人則用第一位
+    var mainMember = urgentMembers.find(function(m) { return m.relation === '本人'; }) || urgentMembers[0];
+    withNickname(mainMember.maskedId || '', mainMember.name, function(salutation) {
+      var msg = "✨【家庭保單到期提醒】✨\n\n";
+      msg += salutation + " 您好，\n以下為貴家庭即將到期的保障，請確認續約安排：\n\n";
+      urgentMembers.forEach(function(m) {
+        msg += "【" + m.name + "（" + m.relation + "）】\n";
+        m.policies.forEach(function(p) {
+          msg += "  • " + p.type + (p.plate !== '無' ? " " + p.plate : "") + "　到期：" + p.expiry + "（剩 " + p.daysLeft + " 天）\n";
+        });
+        msg += "\n";
+      });
+      msg += "如需協助，歡迎隨時聯繫 " + advisor + "！🙌" +
+        (ADVISOR_LINE ? "\n📲 加入 LINE：https://line.me/ti/p/" + ADVISOR_LINE : "");
+      shareViaLine(msg);
+    });
+  }
+
+  function buildMemberShareText(member, advisor) {
+    return {
+      name: member.name, maskedId: member.maskedId || '',
+      relation: member.relation, advisor: advisor || ADVISOR_NAME,
+      policies: member.policies.map(function(p) {
+        return { type: p.type, plate: p.plate, expiry: p.expiry, daysLeft: p.daysLeft, urgency: p.urgency };
+      })
+    };
+  }
+
+  // ── 家庭圖卡 ──
+  function generateFamilyImageCard() {
+    var target = document.getElementById('familyCardContent');
+    if (!target) return;
+    document.getElementById('loading').style.display = 'block';
+    html2canvas(target, { scale: 2, backgroundColor: "#ffffff", useCORS: true }).then(function(canvas) {
+      document.getElementById('loading').style.display = 'none';
+      var imgSrc  = canvas.toDataURL("image/jpeg", 0.92);
+      var overlay = document.getElementById('familyImageOverlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'familyImageOverlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:2000;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;';
+        document.body.appendChild(overlay);
+      }
+      overlay._imgSrc = imgSrc;
+      overlay.innerHTML =
+        '<div style="background:white;width:100%;max-width:600px;border-radius:20px 20px 0 0;padding:20px;max-height:85vh;overflow-y:auto;box-sizing:border-box;">' +
+          '<div style="color:#d32f2f;font-weight:bold;font-size:14px;margin-bottom:10px;text-align:center;">📸 家庭圖卡已生成！</div>' +
+          '<img id="familyCardImg" style="width:100%;border-radius:10px;box-shadow:0 4px 15px rgba(0,0,0,0.1);margin-bottom:15px;" />' +
+          '<div style="display:flex;gap:10px;">' +
+            '<button onclick="downloadFamilyImage()" style="flex:1;padding:12px;background:#00A3E0;color:white;border:none;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">📥 下載圖卡</button>' +
+            '<button onclick="document.getElementById(\'familyImageOverlay\').style.display=\'none\'" style="flex:1;padding:12px;background:#f1f1f1;color:#333;border:none;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">關閉返回</button>' +
+          '</div>' +
+        '</div>';
+      document.getElementById('familyCardImg').src = imgSrc;
+      overlay.style.display = 'flex';
+    });
+  }
+
+  function downloadFamilyImage() {
+    var overlay = document.getElementById('familyImageOverlay');
+    if (!overlay || !overlay._imgSrc) return;
+    var a = document.createElement('a'); a.href = overlay._imgSrc; a.download = '家庭保障總覽.jpg';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+
+  // ── 產險 Modal 操作 ──
+  function markVehicleStatus(status) {
+    if (!currentPolicyData) return;
+    var policyNo = currentPolicyData.main.policyNo;
+    var name     = currentPolicyData.main.insuredName;
+    var label    = status === '已過戶' ? '已過戶 🔄' : '已報廢 🗑️';
+    if (!confirm('確定將「' + name + '」的保單標記為【' + label + '】？\n\n此保單將不再出現在到期提醒名單中。')) return;
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result && result.success) {
+          alert('✅ 已標記為【' + label + '】');
+          closeModal();
+        } else {
+          alert('❌ 標記失敗，請稍後再試。');
+        }
+      })
+      .updateRenewalStatus(policyNo, status);
+  }
+
+  function closeModal() {
+    document.getElementById('detailModal').style.display = 'none';
+    document.getElementById('travelStatusArea').innerHTML = '';
+    currentPolicyData = null;
+  }
+
+  function generateImageCard() {
+    document.getElementById('loading').style.display = 'block';
+    html2canvas(document.getElementById('modalBody'), { scale: 2, backgroundColor: "#ffffff" }).then(function(canvas) {
+      document.getElementById('generatedImage').src = canvas.toDataURL("image/jpeg", 0.9);
+      document.getElementById('modalBody').style.display = 'none';
+      document.getElementById('actionButtons').style.display = 'none';
+      document.getElementById('imagePreviewContainer').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+    });
+  }
+
+  function closeImagePreview() {
+    document.getElementById('imagePreviewContainer').style.display = 'none';
+    document.getElementById('modalBody').style.display = 'block';
+    document.getElementById('actionButtons').style.display = 'flex';
+  }
+
+  function copyWarmPitch() {
+    if (!currentPolicyData) return;
+    var main  = currentPolicyData.main;
+    var pitch = "哈囉 " + main.insuredName + " 😊\n您的【" + main.type + "】(車牌:" + main.plateNo +
+      ") 即將在 " + main.expiryDate + " 到期囉！有任何需求隨時跟我說，" + ADVISOR_NAME + " 竭誠為您服務！🙌" +
+      (ADVISOR_LINE ? "\n📲 加入 LINE：https://line.me/ti/p/" + ADVISOR_LINE : "");
+    navigator.clipboard.writeText(pitch).then(function() { alert("✅ 已複製話術！"); });
+  }
+
+  function shareToLine() {
+    if (!currentPolicyData) return;
+    var main    = currentPolicyData.main;
+    var details = currentPolicyData.details || [];
+    var effectiveDate = main.effectiveDate || main.effectDate || "—";
+    var expiryDate    = main.expiryDate    || "—";
+    var premium       = main.premium       || "—";
+    var insuredName   = main.insuredName   || "—";
+    var type          = main.type          || "—";
+    var plateNo       = main.plateNo       || "無";
+    var maskedId      = main.maskedId      || "";
+
+    // 查詢稱呼後組訊息
+    withNickname(maskedId, insuredName, function(salutation) {
+      var msg = "✨【保單內容提醒】✨\n\n";
+      msg += salutation + " 您好！\n\n";
+      msg += "📋 以下保單為目前【保單內容】：\n";
+      msg += "────────────────────\n";
+      msg += "📄 險種：" + type + "\n";
+      if (plateNo && plateNo !== "無") msg += "🚗 車號：" + plateNo + "\n";
+      msg += "📅 生效日：" + effectiveDate + "\n";
+      msg += "⏰ 到期日：" + expiryDate + "\n";
+      if (premium && premium !== "無") msg += "💰 總保費：NT$ " + premium + " 元\n";
+      if (details.length > 0) {
+        msg += "\n📌 保障明細：\n";
+        details.forEach(function(d) {
+          msg += "  • " + d.name;
+          if (d.amount && d.amount !== "無") msg += "　保額 " + d.amount;
+          if (d.premium && d.premium !== "無" && d.premium !== "0") msg += "　保費 " + d.premium + " 元";
+          msg += "\n";
+        });
+      }
+      msg += "────────────────────\n\n";
+      msg += "若有任何問題，請隨時回覆聯繫 " + ADVISOR_NAME + "！🙌";
+      if (ADVISOR_LINE) msg += "\n📲 加入 LINE：https://line.me/ti/p/" + ADVISOR_LINE;
+      shareViaLine(msg);
+    });
+  }
+
+  function downloadImage() {
+    var a = document.createElement('a');
+    a.href = document.getElementById('generatedImage').src;
+    a.download = currentPolicyData.main.insuredName + '_保單摘要.jpg';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+</script>
+</body>
+</html>

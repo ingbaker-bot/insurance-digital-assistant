@@ -1,0 +1,11 @@
+# Google Apps Script 專案暫存檔案
+.clasp.json
+node_modules/
+package-lock.json
+
+# 系統與 IDE 檔案
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
